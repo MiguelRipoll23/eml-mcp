@@ -34,8 +34,8 @@ Add to `~/.copilot/mcp-config.json`:
   "mcpServers": {
     "eml": {
       "type": "stdio",
-      "command": "node",
-      "args": ["/absolute/path/to/eml-mcp/dist/server.js", "/path/to/emails", "--from=you@example.com"]
+      "command": "npx",
+      "args": ["-y", "eml-mcp", "/path/to/emails", "--from=you@example.com"]
     }
   }
 }
