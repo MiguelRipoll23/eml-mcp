@@ -1,0 +1,21 @@
+From: Alice <alice@example.com>
+To: Bob <bob@example.com>
+Subject: Email with attachment
+Date: Fri, 02 Jan 2026 09:00:00 +0000
+Message-ID: <msg002@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary42"
+
+--boundary42
+Content-Type: text/plain; charset=utf-8
+
+See the attached file.
+
+--boundary42
+Content-Type: text/plain; name="report.txt"
+Content-Disposition: attachment; filename="report.txt"
+Content-Transfer-Encoding: base64
+
+SGVsbG8gV29ybGQ=
+
+--boundary42--

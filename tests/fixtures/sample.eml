@@ -1,0 +1,11 @@
+From: Alice <alice@example.com>
+To: Bob <bob@example.com>
+CC: Carol <carol@example.com>
+Subject: Hello from Alice
+Date: Thu, 01 Jan 2026 12:00:00 +0000
+Message-ID: <msg001@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Hello Bob, this is a test email from Alice.
+It contains some searchable content.
