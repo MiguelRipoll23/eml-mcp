@@ -198,40 +198,97 @@ export async function handleDeleteEmail(
   }
 }
 
+const indexEntryOutputSchema = {
+  messageId: z.string(),
+  filePath: z.string(),
+  fromAddress: z.string(),
+  toAddresses: z.string(),
+  ccAddresses: z.string(),
+  subject: z.string(),
+  date: z.string(),
+  textBody: z.string(),
+  attachmentNames: z.string(),
+  hasAttachments: z.number(),
+  fileSize: z.number(),
+  indexedAt: z.string(),
+  folder: z.string(),
+};
+
 export function registerEmailTools(server: McpServer, services: Services): void {
-  server.tool(
+  server.registerTool(
     'search_emails',
-    'Search emails by keyword, sender, date, and other filters',
-    searchSchema,
+    {
+      description: 'Search emails by keyword, sender, date, and other filters',
+      inputSchema: searchSchema,
+      outputSchema: {
+        results: z.array(z.object(indexEntryOutputSchema)),
+        count: z.number(),
+      },
+    },
     (args) => handleSearchEmails(args, services),
   );
 
-  server.tool(
+  server.registerTool(
     'get_email',
-    'Parse and return a single .eml file with full content',
-    getEmailSchema,
+    {
+      description: 'Parse and return a single .eml file with full content',
+      inputSchema: getEmailSchema,
+      outputSchema: {
+        header: z.object({
+          messageId: z.string(),
+          from: z.string(),
+          to: z.array(z.string()),
+          cc: z.array(z.string()),
+          bcc: z.array(z.string()),
+          subject: z.string(),
+          date: z.string(),
+          filePath: z.string(),
+          folder: z.enum(['inbox', 'outbox', 'drafts']).optional(),
+        }),
+        textBody: z.string().optional(),
+        htmlBody: z.string().optional(),
+        attachments: z.array(z.object({
+          filename: z.string(),
+          contentType: z.string(),
+          size: z.number(),
+          contentId: z.string().optional(),
+        })),
+      },
+    },
     (args) => handleGetEmail(args, services),
   );
 
-  server.tool(
+  server.registerTool(
     'compose_email',
-    'Create a new .eml draft and open it in the default mail client',
-    composeSchema,
+    {
+      description: 'Create a new .eml draft and open it in the default mail client',
+      inputSchema: composeSchema,
+      outputSchema: { filePath: z.string() },
+    },
     (args) => handleComposeEmail(args, services),
   );
 
-  server.tool(
+  server.registerTool(
     'update_email',
-    'Modify an existing .eml draft and re-open it',
-    updateSchema,
+    {
+      description: 'Modify an existing .eml draft and re-open it',
+      inputSchema: updateSchema,
+      outputSchema: { filePath: z.string() },
+    },
     (args) => handleUpdateEmail(args, services),
   );
 
-  server.tool(
+  server.registerTool(
     'delete_email',
-    'Permanently delete an .eml file from disk and remove it from the index',
     {
-      filePath: z.string().describe('Absolute path to the .eml file to delete'),
+      description: 'Permanently delete an .eml file from disk and remove it from the index',
+      inputSchema: {
+        filePath: z.string().describe('Absolute path to the .eml file to delete'),
+      },
+      outputSchema: {
+        filePath: z.string(),
+        removedFromIndex: z.boolean(),
+      },
     },
     (args) => handleDeleteEmail(args, services),
   );

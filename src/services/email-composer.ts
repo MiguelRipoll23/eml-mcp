@@ -55,8 +55,8 @@ export class EmailComposer {
       cc: options.cc,
       bcc: options.bcc,
       subject: options.subject,
-      text: options.textBody,
-      html: options.htmlBody,
+      text: options.textBody?.replace(/\r?\n/g, '\r\n'),
+      html: options.htmlBody ?? (options.textBody ? this.textToHtml(options.textBody) : undefined),
       attachments: [...bufferAttachments, ...pathAttachments],
     });
 
@@ -79,6 +79,15 @@ export class EmailComposer {
     const filePath = await this.compose(options);
     await this.filesystem.openWithDefaultApp(filePath);
     return filePath;
+  }
+
+  private textToHtml(text: string): string {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const withBreaks = escaped.replace(/\r?\n/g, '<br>\r\n');
+    return `<html><body>${withBreaks}</body></html>`;
   }
 
   private buildFilename(subject: string): string {

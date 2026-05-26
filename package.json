@@ -1,7 +1,6 @@
 {
   "name": "eml-mcp",
-  "version": "1.0.0",
-  "description": "MCP server for managing email archives stored as .eml files",
+  "version": "1.0.1",
   "type": "module",
   "main": "dist/server.js",
   "bin": {
@@ -15,19 +14,8 @@
     "dev": "tsx src/server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "start": "node dist/server.js",
-    "prepublishOnly": "npm run build"
+    "start": "node dist/server.js"
   },
-  "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "eml",
-    "email",
-    "outlook",
-    "mail",
-    "server"
-  ],
-  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
     "sql.js": "^1.12.0",

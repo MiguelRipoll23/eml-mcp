@@ -1,5 +1,6 @@
 export type McpToolResult = {
   content: [{ type: 'text'; text: string }];
+  structuredContent?: Record<string, unknown>;
   isError?: true;
 };
 
@@ -24,7 +25,10 @@ export function toMcpSuccess(data: unknown): McpToolResult {
     if (value instanceof Date) return toLocalISOString(value);
     return value;
   }, 2);
-  return { content: [{ type: 'text', text }] };
+  return {
+    content: [{ type: 'text', text }],
+    structuredContent: JSON.parse(text) as Record<string, unknown>,
+  };
 }
 
 export function toMcpError(code: string, message: string): McpToolResult {

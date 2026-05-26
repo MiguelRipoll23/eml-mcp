@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Services } from '../types/service.types.js';
 import { toMcpSuccess } from '../types/error.types.js';
@@ -78,10 +79,16 @@ export async function handleRefreshIndex(services: Services) {
 }
 
 export function registerIndexTools(server: McpServer, services: Services): void {
-  server.tool(
+  server.registerTool(
     'refresh_index',
-    'Incrementally update the index: add new, remove deleted, update changed files',
-    {},
+    {
+      description: 'Incrementally update the index: add new, remove deleted, update changed files',
+      outputSchema: {
+        added: z.number(),
+        removed: z.number(),
+        updated: z.number(),
+      },
+    },
     () => handleRefreshIndex(services),
   );
 }

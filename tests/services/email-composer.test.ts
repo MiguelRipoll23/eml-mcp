@@ -55,5 +55,36 @@ describe('EmailComposer', () => {
       const content = fs.readFileSync(filePath, 'utf-8');
       expect(content).toContain('alice@example.com');
     });
+
+    it('generates multipart/alternative with HTML part when only textBody is provided', async () => {
+      const filePath = await composer.compose({
+        to: ['bob@example.com'],
+        subject: 'Line break test',
+        textBody: 'Line one\nLine two\nLine three',
+      });
+
+      const content = fs.readFileSync(filePath, 'utf-8');
+      expect(content).toContain('multipart/alternative');
+      expect(content).toContain('text/html');
+      expect(content).toContain('<br>');
+    });
+
+    it('uses CRLF line endings throughout the .eml', async () => {
+      const filePath = await composer.compose({
+        to: ['bob@example.com'],
+        subject: 'CRLF test',
+        textBody: 'Line one\nLine two',
+      });
+
+      const bytes = fs.readFileSync(filePath);
+      let crlf = 0;
+      let lfOnly = 0;
+      for (let i = 0; i < bytes.length; i++) {
+        if (bytes[i] === 0x0d && bytes[i + 1] === 0x0a) crlf++;
+        else if (bytes[i] === 0x0a && (i === 0 || bytes[i - 1] !== 0x0d)) lfOnly++;
+      }
+      expect(crlf).toBeGreaterThan(0);
+      expect(lfOnly).toBe(0);
+    });
   });
 });

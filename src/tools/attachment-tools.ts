@@ -70,38 +70,66 @@ export async function handleSearchAttachments(
   }
 }
 
+const indexEntryOutputSchema = {
+  messageId: z.string(),
+  filePath: z.string(),
+  fromAddress: z.string(),
+  toAddresses: z.string(),
+  ccAddresses: z.string(),
+  subject: z.string(),
+  date: z.string(),
+  textBody: z.string(),
+  attachmentNames: z.string(),
+  hasAttachments: z.number(),
+  fileSize: z.number(),
+  indexedAt: z.string(),
+  folder: z.string(),
+};
+
 export function registerAttachmentTools(server: McpServer, services: Services): void {
-  server.tool(
+  server.registerTool(
     'extract_attachments',
-    'Save attachments from an email to a directory. Provide filename to extract one; omit to extract all.',
     {
-      filePath: z.string().describe('Absolute path to the .eml file'),
-      filename: z.string().optional().describe('Exact attachment filename — omit to extract all'),
-      outputDir: z.string().describe('Absolute path to the output directory'),
+      description: 'Save attachments from an email to a directory. Provide filename to extract one; omit to extract all.',
+      inputSchema: {
+        filePath: z.string().describe('Absolute path to the .eml file'),
+        filename: z.string().optional().describe('Exact attachment filename — omit to extract all'),
+        outputDir: z.string().describe('Absolute path to the output directory'),
+      },
+      outputSchema: { savedPaths: z.array(z.string()) },
     },
     (args) => handleExtractAttachments(args, services),
   );
 
-  server.tool(
+  server.registerTool(
     'open_attachment',
-    'Open an attachment with the system default application',
     {
-      filePath: z.string().describe('Absolute path to the .eml file'),
-      filename: z.string().describe('Exact attachment filename'),
+      description: 'Open an attachment with the system default application',
+      inputSchema: {
+        filePath: z.string().describe('Absolute path to the .eml file'),
+        filename: z.string().describe('Exact attachment filename'),
+      },
+      outputSchema: { tempPath: z.string() },
     },
     (args) => handleOpenAttachment(args, services),
   );
 
-  server.tool(
+  server.registerTool(
     'search_attachments',
-    'Find emails containing attachments matching filename, type, or content hints',
     {
-      filename: z.string().optional().describe('Partial attachment filename'),
-      contentType: z
-        .string()
-        .optional()
-        .describe('MIME type (e.g. application/pdf) — searches by file extension derived from the subtype'),
-      keyword: z.string().optional().describe('Content or name keyword'),
+      description: 'Find emails containing attachments matching filename, type, or content hints',
+      inputSchema: {
+        filename: z.string().optional().describe('Partial attachment filename'),
+        contentType: z
+          .string()
+          .optional()
+          .describe('MIME type (e.g. application/pdf) — searches by file extension derived from the subtype'),
+        keyword: z.string().optional().describe('Content or name keyword'),
+      },
+      outputSchema: {
+        results: z.array(z.object(indexEntryOutputSchema)),
+        count: z.number(),
+      },
     },
     (args) => handleSearchAttachments(args, services),
   );
