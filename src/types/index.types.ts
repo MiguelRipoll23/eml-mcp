@@ -14,6 +14,20 @@ export interface IndexEntry {
   folder: string;
 }
 
+export interface SearchResult {
+  messageId: string;
+  filePath: string;
+  fromAddress: string | null;
+  toAddresses: string | null;
+  ccAddresses: string | null;
+  subject: string | null;
+  date: string | null;
+  hasAttachments: number;
+  fileSize: number;
+  indexedAt: string | null;
+  folder: string;
+}
+
 export interface IndexStats {
   totalEmails: number;
   totalAttachments: number;

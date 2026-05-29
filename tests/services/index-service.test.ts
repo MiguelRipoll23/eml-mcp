@@ -57,7 +57,7 @@ describe('IndexService', () => {
 
       const results = service.search({ from: 'alice' }, 10);
       expect(results).toHaveLength(1);
-      expect(results[0].from).toContain('alice');
+      expect(results[0].fromAddress).toContain('alice');
     });
 
     it('filters by date range', () => {
@@ -129,6 +129,53 @@ describe('IndexService', () => {
       expect(stats.byFolder.outbox).toBe(1);
       expect(stats.byFolder.drafts).toBe(1);
     });
+  });
+});
+
+describe('search result shape', () => {
+  let service: IndexService;
+
+  beforeEach(async () => {
+    service = new IndexService(':memory:');
+    await service.initialize();
+  });
+
+  it('returns fromAddress (not from) in result objects', () => {
+    service.upsert(makeEntry({ fromAddress: 'alice@example.com' }));
+    const results = service.search({}, 10);
+    expect(results[0].fromAddress).toBe('alice@example.com');
+    expect((results[0] as Record<string, unknown>)['from']).toBeUndefined();
+  });
+
+  it('returns hasAttachments, fileSize, and indexedAt in search results', () => {
+    const indexedAt = '2026-05-27T10:00:00.000Z';
+    service.upsert(makeEntry({ hasAttachments: 1, fileSize: 4096, indexedAt }));
+    const results = service.search({}, 10);
+    expect(results[0].hasAttachments).toBe(1);
+    expect(results[0].fileSize).toBe(4096);
+    expect(results[0].indexedAt).toBe(indexedAt);
+  });
+
+  it('returns null fromAddress and toAddresses for drafts stored with no sender', () => {
+    service.upsert(makeEntry({
+      messageId: '<draft@example.com>',
+      fromAddress: null as unknown as string,
+      toAddresses: null as unknown as string,
+      ccAddresses: null as unknown as string,
+      folder: 'drafts',
+    }));
+    const results = service.search({ folder: 'drafts' }, 10);
+    expect(results[0].fromAddress).toBeNull();
+    expect(results[0].toAddresses).toBeNull();
+    expect(results[0].ccAddresses).toBeNull();
+  });
+
+  it('keyword search also returns fromAddress and hasAttachments', () => {
+    service.upsert(makeEntry({ fromAddress: 'alice@example.com', hasAttachments: 0, fileSize: 2048, subject: 'Budget Report' }));
+    const results = service.search({ keyword: 'Budget' }, 10);
+    expect(results[0].fromAddress).toBe('alice@example.com');
+    expect(results[0].hasAttachments).toBe(0);
+    expect(results[0].fileSize).toBe(2048);
   });
 });
 

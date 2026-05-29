@@ -83,6 +83,7 @@ export function registerIndexTools(server: McpServer, services: Services): void 
     'refresh_index',
     {
       description: 'Incrementally update the index: add new, remove deleted, update changed files',
+      annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
       outputSchema: {
         added: z.number(),
         removed: z.number(),

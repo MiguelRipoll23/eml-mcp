@@ -91,6 +91,7 @@ export function registerAttachmentTools(server: McpServer, services: Services): 
     'extract_attachments',
     {
       description: 'Save attachments from an email to a directory. Provide filename to extract one; omit to extract all.',
+      annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
       inputSchema: {
         filePath: z.string().describe('Absolute path to the .eml file'),
         filename: z.string().optional().describe('Exact attachment filename — omit to extract all'),
@@ -105,6 +106,7 @@ export function registerAttachmentTools(server: McpServer, services: Services): 
     'open_attachment',
     {
       description: 'Open an attachment with the system default application',
+      annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: true },
       inputSchema: {
         filePath: z.string().describe('Absolute path to the .eml file'),
         filename: z.string().describe('Exact attachment filename'),
@@ -118,6 +120,7 @@ export function registerAttachmentTools(server: McpServer, services: Services): 
     'search_attachments',
     {
       description: 'Find emails containing attachments matching filename, type, or content hints',
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
       inputSchema: {
         filename: z.string().optional().describe('Partial attachment filename'),
         contentType: z

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
-import { handleSearchEmails, handleGetEmail, handleComposeEmail, handleUpdateEmail, handleDeleteEmail } from '../../src/tools/email-tools.js';
+import { handleSearchEmails, handleGetEmail, handleComposeEmail, handleUpdateEmail, handleDeleteEmail, handleOpenEmail } from '../../src/tools/email-tools.js';
 import type { Services } from '../../src/types/service.types.js';
 import type { EmailHeader, ParsedEmail } from '../../src/types/email.types.js';
 
@@ -25,6 +25,20 @@ const mockHeader: EmailHeader = {
   filePath: 'C:\\Outlook\\test.eml',
 };
 
+const mockSearchResult = {
+  messageId: '<abc@example.com>',
+  filePath: 'C:\\Outlook\\test.eml',
+  fromAddress: 'alice@example.com',
+  toAddresses: 'bob@example.com',
+  ccAddresses: '',
+  subject: 'Test',
+  date: '2026-01-01T00:00:00.000Z',
+  hasAttachments: 0,
+  fileSize: 1024,
+  indexedAt: '2026-01-01T00:00:00.000Z',
+  folder: 'inbox',
+};
+
 const mockParsed: ParsedEmail = {
   header: mockHeader,
   textBody: 'Hello world',
@@ -46,7 +60,7 @@ function makeServices(overrides: Partial<Services> = {}): Services {
       invalidate: vi.fn(),
     } as never,
     index: {
-      search: vi.fn().mockReturnValue([mockHeader]),
+      search: vi.fn().mockReturnValue([mockSearchResult]),
       upsert: vi.fn(),
       count: vi.fn().mockReturnValue(1),
     } as never,
@@ -67,6 +81,50 @@ describe('handleSearchEmails', () => {
     const data = JSON.parse(result.content[0].text);
     expect(data.results).toHaveLength(1);
     expect(data.results[0].subject).toBe('Test');
+  });
+
+  it('returns fromAddress matching the outputSchema (not the EmailHeader from field)', async () => {
+    const services = makeServices();
+    const result = await handleSearchEmails({ keyword: 'test', limit: 10 }, services);
+    const data = JSON.parse(result.content[0].text);
+    expect(data.results[0].fromAddress).toBe('alice@example.com');
+    expect(data.results[0].from).toBeUndefined();
+  });
+
+  it('returns hasAttachments, fileSize, and indexedAt in search results', async () => {
+    const services = makeServices();
+    const result = await handleSearchEmails({ keyword: 'test', limit: 10 }, services);
+    const data = JSON.parse(result.content[0].text);
+    expect(data.results[0].hasAttachments).toBe(0);
+    expect(data.results[0].fileSize).toBe(1024);
+    expect(typeof data.results[0].indexedAt).toBe('string');
+  });
+
+  it('returns null fromAddress and toAddresses for draft emails with no sender', async () => {
+    const draftResult = {
+      messageId: '<draft@example.com>',
+      filePath: 'C:\\Outlook\\drafts\\draft.eml',
+      fromAddress: null,
+      toAddresses: null,
+      ccAddresses: null,
+      subject: 'Unsent draft',
+      date: '2026-01-01T00:00:00.000Z',
+      hasAttachments: 0,
+      fileSize: 512,
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      folder: 'drafts',
+    };
+    const services = makeServices({
+      index: {
+        search: vi.fn().mockReturnValue([draftResult]),
+        count: vi.fn().mockReturnValue(1),
+        upsert: vi.fn(),
+      } as never,
+    });
+    const result = await handleSearchEmails({ folder: 'drafts', limit: 5 }, services);
+    const data = JSON.parse(result.content[0].text);
+    expect(data.results[0].fromAddress).toBeNull();
+    expect(data.results[0].toAddresses).toBeNull();
   });
 });
 
@@ -307,5 +365,47 @@ describe('handleDeleteEmail', () => {
     expect(data.removedFromIndex).toBe(false);
     expect(fs.unlinkSync).toHaveBeenCalledWith('C:\\Outlook\\unindexed.eml');
     expect(services.index.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleOpenEmail', () => {
+  beforeEach(() => {
+    vi.mocked(fs.existsSync).mockClear();
+  });
+
+  it('opens the file with the default app and returns filePath', async () => {
+    vi.mocked(fs.existsSync).mockReturnValueOnce(true);
+    const openWithDefaultApp = vi.fn().mockResolvedValue(undefined);
+    const services = makeServices({
+      filesystem: { openWithDefaultApp } as never,
+    });
+    const result = await handleOpenEmail({ filePath: 'C:\\Outlook\\inbox\\test.eml' }, services);
+    const data = JSON.parse(result.content[0].text);
+    expect(data.filePath).toBe('C:\\Outlook\\inbox\\test.eml');
+    expect(openWithDefaultApp).toHaveBeenCalledWith('C:\\Outlook\\inbox\\test.eml');
+  });
+
+  it('returns FILE_NOT_FOUND when file does not exist', async () => {
+    vi.mocked(fs.existsSync).mockReturnValueOnce(false);
+    const services = makeServices({
+      filesystem: { openWithDefaultApp: vi.fn() } as never,
+    });
+    const result = await handleOpenEmail({ filePath: 'C:\\Outlook\\missing.eml' }, services);
+    expect(result.isError).toBe(true);
+    const data = JSON.parse(result.content[0].text);
+    expect(data.error).toBe('FILE_NOT_FOUND');
+  });
+
+  it('returns FILE_NOT_FOUND when openWithDefaultApp throws', async () => {
+    vi.mocked(fs.existsSync).mockReturnValueOnce(true);
+    const services = makeServices({
+      filesystem: {
+        openWithDefaultApp: vi.fn().mockRejectedValue(new Error('no handler')),
+      } as never,
+    });
+    const result = await handleOpenEmail({ filePath: 'C:\\Outlook\\inbox\\test.eml' }, services);
+    expect(result.isError).toBe(true);
+    const data = JSON.parse(result.content[0].text);
+    expect(data.error).toBe('FILE_NOT_FOUND');
   });
 });

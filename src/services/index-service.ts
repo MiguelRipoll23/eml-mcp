@@ -1,8 +1,8 @@
 import initSqlJs from 'sql.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { IndexEntry, IndexStats } from '../types/index.types.js';
-import type { SearchFilters, EmailHeader } from '../types/email.types.js';
+import type { IndexEntry, IndexStats, SearchResult } from '../types/index.types.js';
+import type { SearchFilters } from '../types/email.types.js';
 
 const CREATE_META = `
   CREATE TABLE IF NOT EXISTS emails_meta (
@@ -173,7 +173,7 @@ export class IndexService {
     return (rows[0]?.['total'] as number) ?? 0;
   }
 
-  search(filters: SearchFilters, limit: number): EmailHeader[] {
+  search(filters: SearchFilters, limit: number): SearchResult[] {
     this.assertInitialized();
     let activeFilters = { ...filters };
 
@@ -189,7 +189,8 @@ export class IndexService {
 
     if (activeFilters.keyword) {
       sql = `
-        SELECT m.messageId, m.filePath, m.fromAddress, m.toAddresses, m.ccAddresses, m.subject, m.date, m.folder
+        SELECT m.messageId, m.filePath, m.fromAddress, m.toAddresses, m.ccAddresses,
+               m.subject, m.date, m.hasAttachments, m.fileSize, m.indexedAt, m.folder
         FROM emails_fts f
         JOIN emails_meta m ON f.messageId = m.messageId
         WHERE emails_fts MATCH ?
@@ -200,7 +201,8 @@ export class IndexService {
       allParams = [activeFilters.keyword, ...params, limit];
     } else {
       sql = `
-        SELECT messageId, filePath, fromAddress, toAddresses, ccAddresses, subject, date, folder
+        SELECT messageId, filePath, fromAddress, toAddresses, ccAddresses,
+               subject, date, hasAttachments, fileSize, indexedAt, folder
         FROM emails_meta m
         ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}
         ORDER BY date DESC
@@ -210,7 +212,7 @@ export class IndexService {
     }
 
     const rows = this.query(sql, allParams);
-    return rows.map(row => this.rowToEmailHeader(row));
+    return rows.map(row => this.rowToSearchResult(row));
   }
 
   getStats(): IndexStats {
@@ -250,17 +252,19 @@ export class IndexService {
     return rows as unknown as { messageId: string; filePath: string; indexedAt: string }[];
   }
 
-  private rowToEmailHeader(row: Record<string, SqlValue>): EmailHeader {
+  private rowToSearchResult(row: Record<string, SqlValue>): SearchResult {
     return {
       messageId: row['messageId'] as string,
       filePath: row['filePath'] as string,
-      from: (row['fromAddress'] as string) ?? '',
-      to: ((row['toAddresses'] as string) || '').split(',').map(s => s.trim()).filter(Boolean),
-      cc: ((row['ccAddresses'] as string) || '').split(',').map(s => s.trim()).filter(Boolean),
-      bcc: [],
-      subject: (row['subject'] as string) ?? '',
-      date: new Date((row['date'] as string) ?? ''),
-      folder: (row['folder'] as EmailHeader['folder']) ?? undefined,
+      fromAddress: (row['fromAddress'] as string | null) ?? null,
+      toAddresses: (row['toAddresses'] as string | null) ?? null,
+      ccAddresses: (row['ccAddresses'] as string | null) ?? null,
+      subject: (row['subject'] as string | null) ?? null,
+      date: (row['date'] as string | null) ?? null,
+      hasAttachments: (row['hasAttachments'] as number) ?? 0,
+      fileSize: (row['fileSize'] as number) ?? 0,
+      indexedAt: (row['indexedAt'] as string | null) ?? null,
+      folder: (row['folder'] as string) ?? 'drafts',
     };
   }
 }
