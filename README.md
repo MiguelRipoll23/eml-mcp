@@ -119,6 +119,7 @@ eml-mcp will tag these emails as `outbox`.
 | `get_email` | Parse and return a single email |
 | `compose_email` | Create a new draft `.eml` and open it |
 | `update_email` | Modify an existing draft and re-open it |
+| `open_email` | Open an existing `.eml` in the default mail client (works for inbox, outbox, and drafts) |
 | `delete_email` | Permanently delete an `.eml` file and remove it from the index |
 | `extract_attachments` | Save one or all attachments from an email to a directory |
 | `open_attachment` | Open an attachment with the system default application |

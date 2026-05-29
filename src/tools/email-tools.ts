@@ -177,6 +177,22 @@ export async function handleUpdateEmail(
   }
 }
 
+export async function handleOpenEmail(
+  args: { filePath: string },
+  services: Services,
+) {
+  if (!fs.existsSync(args.filePath)) {
+    return toMcpError('FILE_NOT_FOUND', `File not found: ${args.filePath}`);
+  }
+  try {
+    await services.filesystem.openWithDefaultApp(args.filePath);
+    return toMcpSuccess({ filePath: args.filePath });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return toMcpError('FILE_NOT_FOUND', message);
+  }
+}
+
 export async function handleDeleteEmail(
   args: { filePath: string },
   services: Services,
@@ -201,16 +217,14 @@ export async function handleDeleteEmail(
 const indexEntryOutputSchema = {
   messageId: z.string(),
   filePath: z.string(),
-  fromAddress: z.string(),
-  toAddresses: z.string(),
-  ccAddresses: z.string(),
-  subject: z.string(),
-  date: z.string(),
-  textBody: z.string(),
-  attachmentNames: z.string(),
+  fromAddress: z.string().nullable(),
+  toAddresses: z.string().nullable(),
+  ccAddresses: z.string().nullable(),
+  subject: z.string().nullable(),
+  date: z.string().nullable(),
   hasAttachments: z.number(),
   fileSize: z.number(),
-  indexedAt: z.string(),
+  indexedAt: z.string().nullable(),
   folder: z.string(),
 };
 
@@ -219,6 +233,7 @@ export function registerEmailTools(server: McpServer, services: Services): void 
     'search_emails',
     {
       description: 'Search emails by keyword, sender, date, and other filters',
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
       inputSchema: searchSchema,
       outputSchema: {
         results: z.array(z.object(indexEntryOutputSchema)),
@@ -232,6 +247,7 @@ export function registerEmailTools(server: McpServer, services: Services): void 
     'get_email',
     {
       description: 'Parse and return a single .eml file with full content',
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
       inputSchema: getEmailSchema,
       outputSchema: {
         header: z.object({
@@ -262,6 +278,7 @@ export function registerEmailTools(server: McpServer, services: Services): void 
     'compose_email',
     {
       description: 'Create a new .eml draft and open it in the default mail client',
+      annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: true },
       inputSchema: composeSchema,
       outputSchema: { filePath: z.string() },
     },
@@ -272,6 +289,7 @@ export function registerEmailTools(server: McpServer, services: Services): void 
     'update_email',
     {
       description: 'Modify an existing .eml draft and re-open it',
+      annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: true },
       inputSchema: updateSchema,
       outputSchema: { filePath: z.string() },
     },
@@ -279,9 +297,23 @@ export function registerEmailTools(server: McpServer, services: Services): void 
   );
 
   server.registerTool(
+    'open_email',
+    {
+      description: 'Open an existing .eml file in the default mail client. Use search_emails to find the filePath first.',
+      annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      inputSchema: {
+        filePath: z.string().describe('Absolute path to the .eml file to open'),
+      },
+      outputSchema: { filePath: z.string() },
+    },
+    (args) => handleOpenEmail(args, services),
+  );
+
+  server.registerTool(
     'delete_email',
     {
       description: 'Permanently delete an .eml file from disk and remove it from the index',
+      annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false },
       inputSchema: {
         filePath: z.string().describe('Absolute path to the .eml file to delete'),
       },
