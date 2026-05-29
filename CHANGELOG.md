@@ -7,19 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] — 2026-05-29
+
 ### Added
 
 - `open_email` — opens an existing `.eml` file in the default mail client. Works for emails from any folder (inbox, outbox, drafts). Use `search_emails` to locate the file path first.
+- `SearchResult` type with richer fields: `hasAttachments`, `fileSize`, `indexedAt` — returned by `search_emails`.
+- MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) on all tool registrations for better client integration.
 
-### Fixed
+### Changed
 
-- **Line breaks disappearing on reply/forward in Outlook** — composed `.eml` files now generate a `multipart/alternative` structure with both `text/plain` and `text/html` parts. Outlook uses the HTML part for quoting in replies/forwards, preserving line breaks via `<br>` tags instead of performing a lossy plain-text-to-HTML conversion.
-- **RFC 2822 CRLF compliance** — `textBody` line endings are normalized to `\r\n` before being passed to nodemailer, ensuring all body lines use CRLF as required by the email standard.
+- `search_emails` output schema now uses nullable address fields (`fromAddress`, `toAddresses`, `ccAddresses` can be `null` for draft emails with no sender).
+- `IndexService.search()` return type changed from `EmailHeader[]` to `SearchResult[]`.
 
 ### Tests
 
-- Added test asserting composed emails produce `multipart/alternative` with an HTML part when only `textBody` is provided.
-- Added test asserting zero bare LF line endings throughout the generated `.eml` file.
+- Added tests for `handleOpenEmail` — success, file not found, and error propagation.
+- Added tests for `SearchResult` shape — `fromAddress` (not `from`), nullable fields for drafts, and richer field presence in keyword and non-keyword searches.
 
 ---
 
