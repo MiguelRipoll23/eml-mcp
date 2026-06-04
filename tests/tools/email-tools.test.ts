@@ -22,6 +22,7 @@ const mockHeader: EmailHeader = {
   bcc: [],
   subject: 'Test',
   date: new Date('2026-01-01'),
+  dateLocal: 'jueves, 1 de enero de 2026, 01:00',
   filePath: 'C:\\Outlook\\test.eml',
 };
 
@@ -56,6 +57,7 @@ function makeServices(overrides: Partial<Services> = {}): Services {
     filesystem: {} as never,
     parser: {
       parse: vi.fn().mockResolvedValue(mockParsed),
+      parseWithEmbeddedImages: vi.fn().mockResolvedValue(mockParsed),
       parseForRecompose: vi.fn().mockResolvedValue({ header: mockHeader, textBody: 'Hello world', htmlBody: undefined, attachments: [] }),
       invalidate: vi.fn(),
     } as never,
@@ -98,6 +100,15 @@ describe('handleSearchEmails', () => {
     expect(data.results[0].hasAttachments).toBe(0);
     expect(data.results[0].fileSize).toBe(1024);
     expect(typeof data.results[0].indexedAt).toBe('string');
+  });
+
+  it('includes dateLocal in search results', async () => {
+    const services = makeServices();
+    const result = await handleSearchEmails({ keyword: 'test', limit: 10 }, services);
+    const data = JSON.parse(result.content[0].text);
+    expect(data.results[0].dateLocal).toBeDefined();
+    expect(typeof data.results[0].dateLocal).toBe('string');
+    expect(data.results[0].dateLocal).toMatch(/2026/);
   });
 
   it('returns null fromAddress and toAddresses for draft emails with no sender', async () => {
@@ -145,7 +156,7 @@ describe('handleSearchEmails — error handling', () => {
 });
 
 describe('handleGetEmail', () => {
-  it('delegates to EmailParser.parse and returns parsed email', async () => {
+  it('delegates to EmailParser.parseWithEmbeddedImages by default and returns parsed email', async () => {
     const services = makeServices();
     const result = await handleGetEmail({ filePath: 'C:\\Outlook\\test.eml' }, services);
     const data = JSON.parse(result.content[0].text);
@@ -163,10 +174,35 @@ describe('handleGetEmail', () => {
 
   it('returns error when file not found', async () => {
     const services = makeServices({
-      parser: { parse: vi.fn().mockRejectedValue(new Error('ENOENT')), invalidate: vi.fn() } as never,
+      parser: {
+        parse: vi.fn().mockRejectedValue(new Error('ENOENT')),
+        parseWithEmbeddedImages: vi.fn().mockRejectedValue(new Error('ENOENT')),
+        invalidate: vi.fn(),
+      } as never,
     });
     const result = await handleGetEmail({ filePath: 'missing.eml' }, services);
     expect(result.isError).toBe(true);
+  });
+
+  it('calls parseWithEmbeddedImages by default (embedInlineImages not set)', async () => {
+    const services = makeServices();
+    await handleGetEmail({ filePath: 'C:\\Outlook\\test.eml' }, services);
+    expect(services.parser.parseWithEmbeddedImages).toHaveBeenCalledWith('C:\\Outlook\\test.eml');
+    expect(services.parser.parse).not.toHaveBeenCalled();
+  });
+
+  it('calls parse when embedInlineImages is false', async () => {
+    const services = makeServices();
+    await handleGetEmail({ filePath: 'C:\\Outlook\\test.eml', embedInlineImages: false }, services);
+    expect(services.parser.parse).toHaveBeenCalledWith('C:\\Outlook\\test.eml');
+    expect(services.parser.parseWithEmbeddedImages).not.toHaveBeenCalled();
+  });
+
+  it('calls parse (not parseWithEmbeddedImages) when textOnly is true', async () => {
+    const services = makeServices();
+    await handleGetEmail({ filePath: 'C:\\Outlook\\test.eml', textOnly: true }, services);
+    expect(services.parser.parse).toHaveBeenCalled();
+    expect(services.parser.parseWithEmbeddedImages).not.toHaveBeenCalled();
   });
 });
 
@@ -365,6 +401,80 @@ describe('handleDeleteEmail', () => {
     expect(data.removedFromIndex).toBe(false);
     expect(fs.unlinkSync).toHaveBeenCalledWith('C:\\Outlook\\unindexed.eml');
     expect(services.index.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleComposeEmail — replyToFilePath', () => {
+  it('appends quoted thread HTML when replyToFilePath is provided', async () => {
+    const services = makeServices();
+    (services.parser as any).parseForRecompose = vi.fn().mockResolvedValue({
+      header: mockHeader,
+      htmlBody: '<p>Original message</p>',
+      textBody: 'Original message',
+      attachments: [],
+    });
+
+    await handleComposeEmail({
+      to: ['bob@example.com'],
+      subject: 'Re: Test',
+      textBody: 'My reply',
+      replyToFilePath: 'C:\\Outlook\\original.eml',
+    }, services);
+
+    const opts = (services.composer.composeAndOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(opts.htmlBody).toContain('Original message');
+    expect(opts.htmlBody).toContain('My reply');
+    expect(opts.htmlBody).toContain('alice@example.com');
+  });
+
+  it('passes inline images from original as bufferedAttachments', async () => {
+    const services = makeServices();
+    const inlineBuffer = Buffer.from('fakeimage');
+    (services.parser as any).parseForRecompose = vi.fn().mockResolvedValue({
+      header: mockHeader,
+      htmlBody: '<p><img src="cid:img001"></p>',
+      textBody: undefined,
+      attachments: [
+        { filename: 'unnamed', contentType: 'image/png', content: inlineBuffer, cid: 'img001', contentDisposition: 'inline' },
+      ],
+    });
+
+    await handleComposeEmail({
+      to: ['bob@example.com'],
+      subject: 'Re: Test',
+      textBody: 'Reply',
+      replyToFilePath: 'C:\\Outlook\\original.eml',
+    }, services);
+
+    const opts = (services.composer.composeAndOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(opts.bufferedAttachments).toHaveLength(1);
+    expect(opts.bufferedAttachments[0].cid).toBe('img001');
+  });
+
+  it('uses original textBody as fallback when htmlBody is absent', async () => {
+    const services = makeServices();
+    (services.parser as any).parseForRecompose = vi.fn().mockResolvedValue({
+      header: mockHeader,
+      htmlBody: undefined,
+      textBody: 'Plain text original',
+      attachments: [],
+    });
+
+    await handleComposeEmail({
+      to: ['bob@example.com'],
+      subject: 'Re: Test',
+      textBody: 'Reply',
+      replyToFilePath: 'C:\\Outlook\\original.eml',
+    }, services);
+
+    const opts = (services.composer.composeAndOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(opts.htmlBody).toContain('Plain text original');
+  });
+
+  it('does not call parseForRecompose when replyToFilePath is absent', async () => {
+    const services = makeServices();
+    await handleComposeEmail({ to: ['bob@example.com'], subject: 'Hi', textBody: 'Hello' }, services);
+    expect(services.parser.parseForRecompose).not.toHaveBeenCalled();
   });
 });
 

@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Services, ServerConfig } from '../types/service.types.js';
-import type { SearchFilters, EmailFolder } from '../types/email.types.js';
+import type { SearchFilters, EmailFolder, EmailHeader } from '../types/email.types.js';
 import type { ComposeOptions } from '../services/email-composer.js';
 import { toMcpSuccess, toMcpError } from '../types/error.types.js';
 
@@ -22,23 +22,27 @@ const searchSchema = {
 const getEmailSchema = {
   filePath: z.string().describe('Absolute path to the .eml file'),
   textOnly: z.boolean().optional().describe('Return only textBody, omitting htmlBody (reduces response size)'),
+  embedInlineImages: z.boolean().default(true).describe('Replace cid: image references in htmlBody with base64 data URIs'),
 };
 
 const composeSchema = {
-  to: z.array(z.string()).describe('Recipient email addresses'),
-  cc: z.array(z.string()).optional().describe('CC recipients'),
-  bcc: z.array(z.string()).optional().describe('BCC recipients'),
+  to: z.array(z.string()).describe('Recipients in "Name <email>" or plain "email" format'),
+  cc: z.array(z.string()).optional().describe('CC recipients in "Name <email>" or plain "email" format'),
+  bcc: z.array(z.string()).optional().describe('BCC recipients in "Name <email>" or plain "email" format'),
   subject: z.string().describe('Email subject'),
   textBody: z.string().optional().describe('Plain text body'),
   htmlBody: z.string().optional().describe('HTML body'),
   attachmentPaths: z.array(z.string()).optional().describe('Absolute paths to files to attach'),
+  inReplyTo: z.string().optional().describe('Message-ID of the email being replied to, for threading (e.g. "<msg001@example.com>")'),
+  references: z.array(z.string()).optional().describe('Ordered list of message-IDs forming the thread chain (copy from the original email\'s references plus its message-ID)'),
+  replyToFilePath: z.string().optional().describe('Absolute path to the .eml being replied to — appends the original thread as a quoted HTML block with inline images'),
 };
 
 const updateSchema = {
   filePath: z.string().describe('Absolute path to the .eml file to update'),
-  to: z.array(z.string()).optional(),
-  cc: z.array(z.string()).optional(),
-  bcc: z.array(z.string()).optional(),
+  to: z.array(z.string()).optional().describe('Recipients in "Name <email>" or plain "email" format'),
+  cc: z.array(z.string()).optional().describe('CC recipients in "Name <email>" or plain "email" format'),
+  bcc: z.array(z.string()).optional().describe('BCC recipients in "Name <email>" or plain "email" format'),
   subject: z.string().optional(),
   textBody: z.string().optional(),
   htmlBody: z.string().optional(),
@@ -78,7 +82,21 @@ export async function handleSearchEmails(
       folder: args.folder,
     };
     const limit = args.limit ?? 50;
-    const results = services.index.search(filters, limit);
+    const { locale, timeZone } = Intl.DateTimeFormat().resolvedOptions();
+    const results = services.index.search(filters, limit).map(entry => ({
+      ...entry,
+      dateLocal: entry.date
+        ? new Date(entry.date).toLocaleString(locale, {
+            timeZone,
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : null,
+    }));
     const count = services.index.count(filters);
     return toMcpSuccess({ results, count });
   } catch (error) {
@@ -88,10 +106,14 @@ export async function handleSearchEmails(
 }
 
 export async function handleGetEmail(
-  args: { filePath: string; textOnly?: boolean },
+  args: { filePath: string; textOnly?: boolean; embedInlineImages?: boolean },
   services: Services,
 ) {
   try {
+    if (!args.textOnly && args.embedInlineImages !== false) {
+      const email = await services.parser.parseWithEmbeddedImages(args.filePath);
+      return toMcpSuccess(email);
+    }
     const email = await services.parser.parse(args.filePath);
     if (args.textOnly) {
       const { htmlBody: _html, ...withoutHtml } = email;
@@ -104,6 +126,39 @@ export async function handleGetEmail(
   }
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildQuoteBlock(
+  header: EmailHeader,
+  htmlBody: string | undefined,
+  textBody: string | undefined,
+): string {
+  const bodyHtml = htmlBody
+    ?? (textBody
+      ? `<pre style="font-family:inherit;white-space:pre-wrap">${escapeHtml(textBody)}</pre>`
+      : '');
+  const cc = header.cc?.length
+    ? `<b>CC:</b> ${escapeHtml(header.cc.join('; '))}<br>\n  `
+    : '';
+  return `
+<hr style="border:none;border-top:1px solid #e0e0e0;margin:12px 0">
+<div style="font-size:11pt;font-family:Calibri,sans-serif">
+  <b>De:</b> ${escapeHtml(header.from)}<br>
+  <b>Enviado:</b> ${escapeHtml(header.dateLocal)}<br>
+  <b>Para:</b> ${escapeHtml(header.to.join('; '))}<br>
+  ${cc}<b>Asunto:</b> ${escapeHtml(header.subject)}
+</div>
+<blockquote style="margin:0 0 0 .8ex;border-left:2px solid #ccc;padding-left:1ex">
+${bodyHtml}
+</blockquote>`;
+}
+
 export async function handleComposeEmail(
   args: {
     to: string[];
@@ -113,11 +168,39 @@ export async function handleComposeEmail(
     textBody?: string;
     htmlBody?: string;
     attachmentPaths?: string[];
+    inReplyTo?: string;
+    references?: string[];
+    replyToFilePath?: string;
   },
   services: Services,
 ) {
   try {
-    const filePath = await services.composer.composeAndOpen(args);
+    let options: ComposeOptions = {
+      to: args.to,
+      cc: args.cc,
+      bcc: args.bcc,
+      subject: args.subject,
+      textBody: args.textBody,
+      htmlBody: args.htmlBody,
+      attachmentPaths: args.attachmentPaths,
+      inReplyTo: args.inReplyTo,
+      references: args.references,
+    };
+
+    if (args.replyToFilePath) {
+      const original = await services.parser.parseForRecompose(args.replyToFilePath);
+      const quoteHtml = buildQuoteBlock(original.header, original.htmlBody, original.textBody);
+      const newBodyHtml = args.htmlBody
+        ?? `<div style="font-family:Calibri,sans-serif;font-size:11pt">${escapeHtml(args.textBody ?? '').replace(/\r?\n/g, '<br>')}</div>`;
+      options = {
+        ...options,
+        htmlBody: newBodyHtml + quoteHtml,
+        textBody: undefined,
+        bufferedAttachments: original.attachments.filter(a => a.cid),
+      };
+    }
+
+    const filePath = await services.composer.composeAndOpen(options);
     return toMcpSuccess({ filePath });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -150,6 +233,8 @@ export async function handleUpdateEmail(
       bufferedAttachments: existing.attachments,
       attachmentPaths: args.attachmentPaths,
       outputPath: args.filePath,
+      inReplyTo: existing.header.inReplyTo,
+      references: existing.header.references,
     };
     const filePath = await services.composer.composeAndOpen(options);
     services.parser.invalidate(filePath);
@@ -222,6 +307,7 @@ const indexEntryOutputSchema = {
   ccAddresses: z.string().nullable(),
   subject: z.string().nullable(),
   date: z.string().nullable(),
+  dateLocal: z.string().nullable(),
   hasAttachments: z.number(),
   fileSize: z.number(),
   indexedAt: z.string().nullable(),
@@ -258,8 +344,11 @@ export function registerEmailTools(server: McpServer, services: Services): void 
           bcc: z.array(z.string()),
           subject: z.string(),
           date: z.string(),
+          dateLocal: z.string(),
           filePath: z.string(),
           folder: z.enum(['inbox', 'outbox', 'drafts']).optional(),
+          inReplyTo: z.string().optional(),
+          references: z.array(z.string()).optional(),
         }),
         textBody: z.string().optional(),
         htmlBody: z.string().optional(),

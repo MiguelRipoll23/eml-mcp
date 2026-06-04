@@ -60,13 +60,27 @@ describe('EmailComposer', () => {
       const filePath = await composer.compose({
         to: ['bob@example.com'],
         subject: 'Line break test',
-        textBody: 'Line one\nLine two\nLine three',
+        textBody: 'Paragraph one.\n\nParagraph two.',
       });
 
       const content = fs.readFileSync(filePath, 'utf-8');
       expect(content).toContain('multipart/alternative');
       expect(content).toContain('text/html');
-      expect(content).toContain('<br>');
+      expect(content).toContain('<p>');
+    });
+
+    it('reflows single newlines (RFC 2822 hard-wrap) and splits on blank lines', async () => {
+      const filePath = await composer.compose({
+        to: ['bob@example.com'],
+        subject: 'Reflow test',
+        textBody: 'This long sentence wraps\nat 76 chars artificially.\n\nNew paragraph here.',
+      });
+
+      const content = fs.readFileSync(filePath, 'utf-8');
+      // Single newline should be reflowed (no visible break between the two parts)
+      expect(content).toContain('This long sentence wraps at 76 chars artificially.');
+      // Blank line should produce a paragraph break
+      expect(content).toContain('<p>New paragraph here.</p>');
     });
 
     it('uses CRLF line endings throughout the .eml', async () => {

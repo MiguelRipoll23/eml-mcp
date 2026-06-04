@@ -1,0 +1,23 @@
+MIME-Version: 1.0
+From: Alice <alice@example.com>
+To: Bob <bob@example.com>
+Subject: Email with inline image
+Date: Thu, 01 Jan 2026 12:00:00 +0000
+Message-ID: <msg-inline@example.com>
+Content-Type: multipart/related; boundary="REL_BOUNDARY"
+
+--REL_BOUNDARY
+Content-Type: text/html; charset=UTF-8
+
+<html><body><p>See: <img src="cid:img001@example.com"></p></body></html>
+
+--REL_BOUNDARY
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-ID: <img001@example.com>
+Content-Disposition: inline; filename="pixel.png"
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9
+awAAAABJRU5ErkJggg==
+
+--REL_BOUNDARY--

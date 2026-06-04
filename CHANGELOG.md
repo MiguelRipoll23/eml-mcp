@@ -7,57 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
----
-
-## [1.1.0] — 2026-05-29
-
-### Added
-
-- `open_email` — opens an existing `.eml` file in the default mail client. Works for emails from any folder (inbox, outbox, drafts). Use `search_emails` to locate the file path first.
-- `SearchResult` type with richer fields: `hasAttachments`, `fileSize`, `indexedAt` — returned by `search_emails`.
-- MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) on all tool registrations for better client integration.
-
 ### Changed
 
-- `search_emails` output schema now uses nullable address fields (`fromAddress`, `toAddresses`, `ccAddresses` can be `null` for draft emails with no sender).
-- `IndexService.search()` return type changed from `EmailHeader[]` to `SearchResult[]`.
-
-### Tests
-
-- Added tests for `handleOpenEmail` — success, file not found, and error propagation.
-- Added tests for `SearchResult` shape — `fromAddress` (not `from`), nullable fields for drafts, and richer field presence in keyword and non-keyword searches.
+- `formatDateLocal` now uses the server's runtime locale and timezone (`Intl.DateTimeFormat().resolvedOptions()`) instead of hardcoded `es-ES` / `Europe/Madrid`.
+- `search_emails` results now include a `dateLocal` field formatted in the server's local locale and timezone.
 
 ---
 
-## [1.0.0] — 2026-05-22
+## [1.2.0] - 2026-06-02
 
 ### Added
 
-- `compose_email` — creates a new `.eml` draft and opens it in the default mail client. Accepts `to`, `cc`, `bcc`, `subject`, `textBody`, `htmlBody`, and `attachmentPaths`.
-- `get_email` — parses and returns a single `.eml` file with full headers, body, and attachment metadata. Supports `textOnly` flag to reduce response size.
-- `search_emails` — full-text search across body, subject, sender, and attachments with filters for date range, folder, and attachment presence.
-- `update_email` — modifies an existing `.eml` draft in place, preserving existing attachments and re-opening the file.
-- `delete_email` — permanently deletes an `.eml` file from disk and removes it from the index.
-- `extract_attachments` — extracts one or all attachments from an `.eml` file to a target directory.
-- `open_attachment` — opens a specific attachment from an `.eml` with the system default application.
-- `search_attachments` — searches for attachments by filename or MIME type across indexed emails.
-- `refresh_index` — rescans all email directories and updates the SQLite index with new or modified files.
-- `--from` CLI argument to set the sender display name and address for composed drafts (e.g. `--from="Name <email@domain.com>"`).
-- Auto-indexing on server startup — new `.eml` files not yet in the index are indexed automatically at launch.
-- SQLite-backed full-text search index with folder inference (`inbox`, `outbox`, `drafts`) based on file path.
+- **`get_email`: `embedInlineImages` parameter** (default `true`): replaces `cid:` image references in `htmlBody` with base64 data URIs, so inline images render correctly in any viewer without needing the original `.eml` file's attachment parts.
+- **`compose_email`: `replyToFilePath` parameter**: appends the original email as a quoted HTML thread block (including its inline images embedded as base64 data URIs) at the bottom of the composed message, matching standard email-client reply formatting.
+- **`parseForRecompose` captures inline attachments**: the parser now includes attachments with a `Content-ID` header (images embedded inline in HTML bodies) in the recompose attachment list, with CIDs normalised by stripping surrounding angle brackets.
 
-### Removed
+---
 
-- `list_attachments` — superseded by `get_email`, which already returns attachment metadata.
-- `add_attachment` — superseded by `update_email` with `attachmentPaths`.
-- `index_emails` — superseded by `refresh_index`, which is strictly equivalent and clearer.
-- `get_index_stats` — diagnostic tool not needed in the MCP surface.
-- Separate `extract_attachment` and `extract_all_attachments` tools — merged into a single `extract_attachments` tool.
+## [1.1.0] - 2026-06-01
+
+### Added
+
+- **Thread support** (`compose_email`, `update_email`): new `inReplyTo` and `references` fields in `ComposeOptions` and the `compose_email` MCP tool. Composing a reply now writes the correct `In-Reply-To` and `References` RFC 2822 headers, allowing email clients to group messages into threads.
+- **`inReplyTo` and `references` in `EmailHeader`**: `get_email` now returns both threading headers from parsed emails, so a reply can be composed with the full reference chain.
+- **`dateLocal` in `EmailHeader`**: `get_email` now includes a pre-formatted date string in `Europe/Madrid` timezone (e.g. `"lunes, 1 de junio de 2026, 12:37"`). This prevents day-of-week errors that occur when computing locale dates from a raw UTC ISO string.
+- **Full name format in `to`/`cc`/`bcc`**: the parser now returns recipients in `"Name <email>"` format (same as `from`), preserving the display name from the email headers.
 
 ### Fixed
 
-- `update_email` now overwrites the file in place using an atomic write (write to `.tmp` then rename), preserving existing attachments across updates.
-- `search_emails` returns the true total count via a dedicated `count()` query instead of the size of the result page.
-- Folder inference in `update_email` now uses the file path directly instead of falling back to stale index data.
-- Attachment filename extraction uses the MIME type to derive the extension rather than returning raw MIME strings.
-- Full-text search errors are now propagated correctly instead of being silently swallowed.
+- **Line breaks in composed HTML**: `textToHtml` previously converted every `\n` to `<br>`, including RFC 2822 hard-wrap line breaks inserted by nodemailer at 76 characters. This caused mid-sentence line breaks in the HTML part of composed emails. Single newlines are now reflowed (joined with a space) and only blank lines produce paragraph breaks (`<p>` tags).
+
+### Changed
+
+- `compose_email` schema: `to`, `cc`, `bcc` descriptions updated to indicate `"Name <email>"` format is accepted.
+- `update_email` preserves `inReplyTo` and `references` from the existing draft automatically.
+
+---
+
+## [1.0.0] - 2026-05-27
+
+### Added
+
+- `delete_email` tool: permanently deletes a `.eml` file from disk and removes it from the index.
+- `extract_attachments` tool: unified extraction supporting single or all attachments (replaces the former `extract_attachment` and `extract_all_attachments`).
+- `refresh_index` tool: full re-index of configured directories.
+- `search_emails`, `get_email`, `compose_email`, `update_email`, `open_email` tools.
+- `search_attachments`, `open_attachment` tools.
+- `EmailParser` with LRU cache and `mailparser` integration.
+- `EmailComposer` with nodemailer RFC 2822 builder.
+- `IndexService` with `sql.js` FTS4 full-text search and upsert.
+- `AttachmentService` for extraction and shell-open.
+- `FilesystemService` with safe-path enforcement and directory walk.
+- CLI `--from` flag to override the draft `From` address.
+- Auto-index on server startup.
+
+### Removed
+
+- `get_index_stats`: diagnostic tool not needed in MCP surface.
+- `index_emails`: `refresh_index` is strictly superior.
+- `add_attachment`: `update_email` with `attachmentPaths` is equivalent.
+- `list_attachments`: `get_email` already returns attachment metadata.

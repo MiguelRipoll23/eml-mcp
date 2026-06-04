@@ -24,6 +24,10 @@ export interface ComposeOptions {
   bufferedAttachments?: RecomposeAttachment[];
   /** Write to this exact path instead of auto-generating a filename */
   outputPath?: string;
+  /** Message-ID of the email being replied to (In-Reply-To header) */
+  inReplyTo?: string;
+  /** Chain of message-IDs for thread continuity (References header) */
+  references?: string[];
 }
 
 export class EmailComposer {
@@ -58,6 +62,8 @@ export class EmailComposer {
       text: options.textBody?.replace(/\r?\n/g, '\r\n'),
       html: options.htmlBody ?? (options.textBody ? this.textToHtml(options.textBody) : undefined),
       attachments: [...bufferAttachments, ...pathAttachments],
+      inReplyTo: options.inReplyTo,
+      references: options.references?.join(' '),
     });
 
     const emailMessageBuffer = info.message as Buffer;
@@ -86,8 +92,12 @@ export class EmailComposer {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    const withBreaks = escaped.replace(/\r?\n/g, '<br>\r\n');
-    return `<html><body>${withBreaks}</body></html>`;
+    // Split on blank lines (paragraph breaks), reflow single newlines (RFC 2822 word-wrap)
+    const paragraphs = escaped.split(/\r?\n(?:\r?\n)+/);
+    const html = paragraphs
+      .map(p => `<p>${p.replace(/\r?\n/g, ' ').trim()}</p>`)
+      .join('\r\n');
+    return `<html><body>${html}</body></html>`;
   }
 
   private buildFilename(subject: string): string {

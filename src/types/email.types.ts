@@ -8,8 +8,12 @@ export interface EmailHeader {
   bcc: string[];
   subject: string;
   date: Date;
+  /** Human-readable date in Europe/Madrid timezone, e.g. "lunes, 1 de junio de 2026, 12:37" */
+  dateLocal: string;
   filePath: string;
   folder?: EmailFolder;
+  inReplyTo?: string;
+  references?: string[];
 }
 
 export interface Attachment {
