@@ -22,11 +22,14 @@ describe('EmailParser', () => {
 
       expect(result.header.messageId).toBe('<msg001@example.com>');
       expect(result.header.from).toBe('Alice <alice@example.com>');
-      expect(result.header.to).toContain('bob@example.com');
-      expect(result.header.cc).toContain('carol@example.com');
+      expect(result.header.to).toContain('Bob <bob@example.com>');
+      expect(result.header.cc).toContain('Carol <carol@example.com>');
       expect(result.header.subject).toBe('Hello from Alice');
       expect(result.textBody).toContain('Hello Bob');
       expect(result.attachments).toHaveLength(0);
+      // dateLocal must be locale and timezone agnostic
+      expect(result.header.dateLocal).toMatch(/2026/);
+      expect(result.header.dateLocal.length).toBeGreaterThan(0);
     });
 
     it('parses attachment metadata without extracting content', async () => {
@@ -81,6 +84,102 @@ describe('EmailParser', () => {
       await parser.parse(filePath);
 
       expect(readFileSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('parseForRecompose', () => {
+    it('includes inline images in returned attachments', async () => {
+      const result = await parser.parseForRecompose(
+        path.join(FIXTURES, 'sample-with-inline-image.eml'),
+      );
+      const inline = result.attachments.find(a => a.cid === 'img001@example.com');
+      expect(inline).toBeDefined();
+      expect(inline?.content).toBeInstanceOf(Buffer);
+      expect(inline?.contentDisposition).toBe('inline');
+      expect(inline?.contentType).toBe('image/png');
+    });
+
+    it('normalises contentId by stripping angle brackets', async () => {
+      const result = await parser.parseForRecompose(
+        path.join(FIXTURES, 'sample-with-inline-image.eml'),
+      );
+      // mailparser returns "<img001@example.com>"; cid should be "img001@example.com"
+      const inline = result.attachments.find(a => a.cid === 'img001@example.com');
+      expect(inline?.cid).not.toMatch(/^<|>$/);
+    });
+  });
+
+  describe('parseWithEmbeddedImages', () => {
+    it('replaces cid: references in htmlBody with base64 data URIs', async () => {
+      const result = await parser.parseWithEmbeddedImages(
+        path.join(FIXTURES, 'sample-with-inline-image.eml'),
+      );
+      expect(result.htmlBody).toContain('data:image/png;base64,');
+      expect(result.htmlBody).not.toContain('cid:img001@example.com');
+    });
+
+    it('preserves header and textBody unchanged', async () => {
+      const result = await parser.parseWithEmbeddedImages(
+        path.join(FIXTURES, 'sample-with-inline-image.eml'),
+      );
+      expect(result.header.subject).toBe('Email with inline image');
+      expect(result.header.messageId).toBe('<msg-inline@example.com>');
+    });
+
+    it('returns base parse result unchanged when email has no inline images', async () => {
+      const base = await parser.parse(path.join(FIXTURES, 'sample.eml'));
+      const result = await parser.parseWithEmbeddedImages(path.join(FIXTURES, 'sample.eml'));
+      expect(result.htmlBody).toBe(base.htmlBody);
+      expect(result.textBody).toBe(base.textBody);
+    });
+
+    it('resolves all known cid references in the fixture', async () => {
+      const result = await parser.parseWithEmbeddedImages(
+        path.join(FIXTURES, 'sample-with-inline-image.eml'),
+      );
+      // img001 was resolved — no cid: references remain
+      expect(result.htmlBody).not.toMatch(/cid:/i);
+    });
+
+    it('leaves unresolvable cid references unchanged', async () => {
+      // Build a minimal EML where the HTML references cid:unknown@example.com
+      // but the attachment only declares Content-ID: <img001@example.com>.
+      // The unresolvable reference must survive the replacement pass as-is.
+      const emlWithMismatchedCid = [
+        'MIME-Version: 1.0',
+        'From: Alice <alice@example.com>',
+        'To: Bob <bob@example.com>',
+        'Subject: Mismatched CID',
+        'Date: Thu, 01 Jan 2026 12:00:00 +0000',
+        'Message-ID: <msg-mismatch@example.com>',
+        'Content-Type: multipart/related; boundary="REL_BOUNDARY"',
+        '',
+        '--REL_BOUNDARY',
+        'Content-Type: text/html; charset=UTF-8',
+        '',
+        '<html><body><img src="cid:unknown@example.com"></body></html>',
+        '',
+        '--REL_BOUNDARY',
+        'Content-Type: image/png',
+        'Content-Transfer-Encoding: base64',
+        'Content-ID: <img001@example.com>',
+        'Content-Disposition: inline; filename="pixel.png"',
+        '',
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==',
+        '',
+        '--REL_BOUNDARY--',
+      ].join('\r\n');
+
+      const fakePath = path.join(FIXTURES, 'fake-mismatch.eml');
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(Buffer.from(emlWithMismatchedCid));
+
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parseWithEmbeddedImages(fakePath);
+
+      // The unresolvable cid: reference must remain intact
+      expect(result.htmlBody).toContain('cid:unknown@example.com');
+      // No data URI was injected
+      expect(result.htmlBody).not.toContain('data:image/png;base64,');
     });
   });
 });
