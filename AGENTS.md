@@ -73,3 +73,4 @@ eml-mcp/
 3. A draft PR will be created on `version/x.y.z`
 4. Review and merge the PR (with `new-release` label)
 5. Publishing to npm happens automatically
+
