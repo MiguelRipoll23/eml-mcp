@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 - 2026-06-05
+
+## What's Changed
+* docs: add AGENTS.md by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/6
+* Bump version to v1.3.0 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/7
+* Bump version to v1.3.0 by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/8
+
+
+**Full Changelog**: https://github.com/MiguelRipoll23/eml-mcp/compare/v1.2.0...1.3.0
+
+
 ## v1.3.0 - 2026-06-05
 
 ## What's Changed
