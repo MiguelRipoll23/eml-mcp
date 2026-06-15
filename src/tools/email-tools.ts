@@ -16,7 +16,8 @@ const searchSchema = {
   dateTo: z.string().optional().describe('ISO 8601 end date'),
   hasAttachments: z.boolean().optional().describe('Only emails with attachments'),
   folder: z.enum(['inbox', 'outbox', 'drafts']).optional().describe('Filter by folder: inbox (received), outbox (sent), or drafts'),
-  limit: z.number().int().min(1).max(200).optional().default(50),
+  limit: z.number().int().min(1).max(200).optional().default(50).describe('Maximum number of results to return (default 50, max 200)'),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc').describe('Sort order by date: desc = newest first (default), asc = oldest first'),
 };
 
 const getEmailSchema = {
@@ -67,6 +68,7 @@ export async function handleSearchEmails(
     hasAttachments?: boolean;
     folder?: 'inbox' | 'outbox' | 'drafts';
     limit?: number;
+    sortOrder?: 'asc' | 'desc';
   },
   services: Services,
 ) {
@@ -82,8 +84,9 @@ export async function handleSearchEmails(
       folder: args.folder,
     };
     const limit = args.limit ?? 50;
+    const sortOrder = args.sortOrder ?? 'desc';
     const { locale, timeZone } = Intl.DateTimeFormat().resolvedOptions();
-    const results = services.index.search(filters, limit).map(entry => ({
+    const results = services.index.search(filters, limit, sortOrder).map(entry => ({
       ...entry,
       dateLocal: entry.date
         ? new Date(entry.date).toLocaleString(locale, {
@@ -98,7 +101,8 @@ export async function handleSearchEmails(
         : null,
     }));
     const count = services.index.count(filters);
-    return toMcpSuccess({ results, count });
+    const stats = services.index.getStats();
+    return toMcpSuccess({ results, count, indexLastRefreshedAt: stats.lastIndexedAt });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return toMcpError('SEARCH_ERROR', message);
@@ -324,6 +328,7 @@ export function registerEmailTools(server: McpServer, services: Services): void 
       outputSchema: {
         results: z.array(z.object(indexEntryOutputSchema)),
         count: z.number(),
+        indexLastRefreshedAt: z.string().nullable(),
       },
     },
     (args) => handleSearchEmails(args, services),

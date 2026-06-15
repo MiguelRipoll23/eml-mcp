@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **CLI utility** (`eml-cli`): `refresh_index` and `stats` commands for headless operations — refreshing the email index and comparing on-disk vs indexed counts per folder.
+- **Terminal UI** (`eml` / `eml-tui`): Ink-based interactive dashboard for watching email directories, running workflows, and managing `.eml` files directly from the terminal.
+- **`search_emails`: `sortOrder` parameter**: accepts `"asc"` or `"desc"` (default `"desc"`), controlling whether results are returned newest-first or oldest-first. Applied to both plain and full-text keyword searches.
+- **`search_emails`: `indexLastRefreshedAt` field**: the response now includes the ISO timestamp of the last time any email was indexed, so the caller can tell whether the index may be stale before relying on the results.
+
+### Fixed
+
+- **HTML-only `.eml` files not parsed (Outlook-exported emails)**: Outlook sometimes saves sent emails as raw HTML files with a `.eml` extension instead of proper MIME format. The parser now detects this case (file content starts with `<` and has no RFC 2822 headers) and wraps the content in a minimal MIME envelope so the HTML body is correctly extracted. Subject and date are recovered from the filename timestamp pattern `YYYY-MM-DD_HH-MM-SS__Subject.eml` when MIME headers are absent. This fixes both `get_email` (returned empty headers and no body) and `refresh_index` (indexed these files with epoch date `1970-01-01`, making them invisible to date-filtered searches).
+- **Full name truncated when replying to Exchange emails**: display names in `APELLIDO, NOMBRE` format (e.g. `DOE SMITH, JANE ALICE`) were returned unquoted by `formatAddressText`, causing nodemailer's address parser to split on the comma and discard the surname tokens. `formatAddressText` now wraps names containing RFC 2822 special characters (`,`, `;`, `(`, `)`, `<`, `>`, etc.) in double quotes, preserving the full name through the compose pipeline.
+- **Synthetic display name used instead of bare address**: some clients/servers populate the display name with the local-part of the address (e.g. `john.doe` for `john.doe@company.com`) or repeat the full address as the display name. `formatAddressText` now discards a display name that is identical to the local-part or the full address, returning just the bare address instead.
+- **Outlook adds the user as a recipient when doing Reply All on a draft**: composed `.eml` drafts did not carry `X-Unsent: 1`, so Outlook opened them as received messages. When the user clicked Reply All, Outlook included the `From` address (the user's own address) as a new recipient. All drafts now include `X-Unsent: 1`, instructing Outlook to open the file directly in compose mode.
+
+### Changed
+
+- `formatDateLocal` now uses the server's runtime locale and timezone (`Intl.DateTimeFormat().resolvedOptions()`) instead of hardcoded `es-ES` / `Europe/Madrid`.
+- `search_emails` results now include a `dateLocal` field formatted in the server's local locale and timezone.
+
+---
+
 ## [1.3.0] - 2026-06-05
 
 ### Added

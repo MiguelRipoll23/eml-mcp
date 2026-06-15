@@ -100,5 +100,16 @@ describe('EmailComposer', () => {
       expect(crlf).toBeGreaterThan(0);
       expect(lfOnly).toBe(0);
     });
+    it('includes X-Unsent: 1 header in every composed draft', async () => {
+      const filePath = await composer.compose({
+        to: ['bob@example.com'],
+        subject: 'Draft test',
+        textBody: 'body',
+      });
+
+      const content = fs.readFileSync(filePath, 'utf-8');
+      expect(content).toMatch(/^X-Unsent:\s*1/im);
+    });
+
   });
 });

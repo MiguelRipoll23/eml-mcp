@@ -1,8 +1,27 @@
 import { simpleParser } from 'mailparser';
+import * as path from 'path';
 import type { FilesystemService } from './filesystem-service.js';
 import type { ParsedEmail, EmailHeader, Attachment } from '../types/email.types.js';
 import type { RecomposeAttachment } from './email-composer.js';
 import { PARSER_CACHE_SIZE } from '../constants/paths.js';
+
+// Matches filenames like: 2026-06-10_06-45-09__Subject text.eml
+const FILENAME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})__(.+)$/;
+
+function isHtmlOnly(buffer: Buffer): boolean {
+  const start = buffer.toString('utf8', 0, Math.min(buffer.length, 200)).trimStart();
+  if (!start.startsWith('<')) return false;
+  return !/^(from|to|subject|date|mime-version|content-type|message-id|received)\s*:/im.test(start);
+}
+
+function extractFilenameMetadata(filePath: string): { subject?: string; date?: Date } {
+  const base = path.basename(filePath, '.eml');
+  const match = base.match(FILENAME_PATTERN);
+  if (!match) return {};
+  const [, year, month, day, hour, min, sec, subject] = match;
+  const date = new Date(`${year}-${month}-${day}T${hour}:${min}:${sec}Z`);
+  return { subject, date };
+}
 
 export class EmailParser {
   private cache = new Map<string, ParsedEmail>();
@@ -25,7 +44,14 @@ export class EmailParser {
     }
 
     const buffer = this.filesystem.readFile(filePath);
-    const parsed = await simpleParser(buffer);
+    const htmlOnly = isHtmlOnly(buffer);
+    const parseBuffer = htmlOnly
+      ? Buffer.concat([Buffer.from('MIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n'), buffer])
+      : buffer;
+    const parsed = await simpleParser(parseBuffer);
+
+    const filenameMeta = htmlOnly ? extractFilenameMetadata(filePath) : {};
+    const date = parsed.date ?? filenameMeta.date ?? new Date(0);
 
     const header: EmailHeader = {
       messageId: parsed.messageId ?? `<unknown-${Buffer.from(filePath).toString('base64url')}@eml-mcp>`,
@@ -36,9 +62,9 @@ export class EmailParser {
         .flatMap(a => a.value.map(v => this.formatAddressText(v))),
       bcc: (parsed.bcc ? (Array.isArray(parsed.bcc) ? parsed.bcc : [parsed.bcc]) : [])
         .flatMap(a => a.value.map(v => this.formatAddressText(v))),
-      subject: parsed.subject ?? '',
-      date: parsed.date ?? new Date(0),
-      dateLocal: this.formatDateLocal(parsed.date ?? new Date(0)),
+      subject: parsed.subject ?? filenameMeta.subject ?? '',
+      date,
+      dateLocal: this.formatDateLocal(date),
       filePath,
       inReplyTo: parsed.inReplyTo ?? undefined,
       references: this.normalizeReferences(parsed.references),
@@ -160,10 +186,23 @@ export class EmailParser {
 
   private formatAddressText(addr?: { name?: string; address?: string }): string {
     if (!addr) return '';
-    const name = addr.name ?? '';
+    const rawName = addr.name ?? '';
     const address = addr.address ?? '';
-    if (name && address) return `${name} <${address}>`;
-    return address || name;
+    // Discard a display name that was synthesised from the address itself
+    // (e.g. the local-part "john.doe" when the address is "john.doe@company.com",
+    // or when some clients repeat the full address as the display name).
+    const localPart = address.includes('@') ? address.split('@')[0] : '';
+    const name = rawName && rawName !== localPart && rawName !== address ? rawName : '';
+    if (name && address) {
+      // RFC 2822 special chars (comma, semicolon, parens, etc.) must be quoted
+      // so re-parsing the string as an address list doesn't split on them
+      const needsQuoting = /[,;:<>()@\[\]\\"]/.test(name);
+      const safeName = needsQuoting
+        ? `"${name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+        : name;
+      return `${safeName} <${address}>`;
+    }
+    return address || rawName;
   }
 
   private normalizeReferences(refs: string | string[] | undefined): string[] | undefined {
