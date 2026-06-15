@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.0.0-beta.2 - 2026-06-15
+
+## What's Changed
+* fix: remove EML_HOME env var, fix publish workflow trigger by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/12
+* fix: update get-next-version to v3.2.0 by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/13
+* Bump version to v2.0.0-beta.2 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/14
+
+
+**Full Changelog**: https://github.com/MiguelRipoll23/eml-mcp/compare/v2.0.0-beta.1...v2.0.0-beta.2
+
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
