@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.0.0-beta.3 - 2026-06-15
+
+## What's Changed
+* fix: add repository field for npm provenance by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/15
+* Bump version to v2.0.0-beta.3 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/16
+
+
+**Full Changelog**: https://github.com/MiguelRipoll23/eml-mcp/compare/v2.0.0-beta.2...v2.0.0-beta.3
+
+
 ## v2.0.0-beta.2 - 2026-06-15
 
 ## What's Changed
