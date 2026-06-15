@@ -39,4 +39,5 @@ export interface SearchFilters {
   dateTo?: string;
   hasAttachments?: boolean;
   folder?: EmailFolder;
+  filePath?: string;
 }

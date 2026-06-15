@@ -1,35 +1,60 @@
-import React, { useMemo } from 'react';
-import { Box, Text, useStdout } from 'ink';
+import React, { useCallback, useState } from 'react';
+import { Box, Text, useInput, useWindowSize } from 'ink';
 import type { Services } from '../../types/service.types.js';
 import type { LoadedWorkflowConfig } from '../types/workflow.types.js';
-import { ProcessedStore } from '../services/processed-store.js';
 import { useIndexWatcher } from '../hooks/useIndexWatcher.js';
+import { openWorkflowPromptFile } from '../services/workflow-runner.js';
 import { WorkflowsPanel } from './WorkflowsPanel.js';
 import { LogPanel } from './LogPanel.js';
 import { VERSION } from '../../constants/version.js';
+
+type ActiveView = 'log' | 'workflows';
+
+const VIEWS: ActiveView[] = ['log', 'workflows'];
+const BLUE = '#89B4FA';
+const PINK = '#F38BA8';
+
+const VIEW_COLOR: Record<ActiveView, string> = {
+  log:       PINK,
+  workflows: BLUE,
+};
 
 interface DashboardProps {
   services: Services;
   workflows: LoadedWorkflowConfig[];
   workflowErrors: string[];
   promptsDirectory: string;
-  processedStorePath: string;
 }
 
-export function Dashboard({ services, workflows, workflowErrors, promptsDirectory, processedStorePath }: DashboardProps) {
-  const { stdout } = useStdout();
-  const columns = stdout?.columns ?? 80;
+export function Dashboard({ services, workflows, workflowErrors, promptsDirectory }: DashboardProps) {
+  const { columns } = useWindowSize();
 
-  const store = useMemo(() => {
-    const s = new ProcessedStore(processedStorePath);
-    s.load();
-    return s;
-  }, [processedStorePath]);
+  const [activeView, setActiveView] = useState<ActiveView>('log');
+  const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
 
-  const { log, workflowStats } = useIndexWatcher(
+  useInput((_input, key) => {
+    if (workflowDialogOpen) return; // dialog captures input; don't switch tabs
+    if (key.tab || key.leftArrow) {
+      setActiveView(prev => {
+        const idx = VIEWS.indexOf(prev);
+        return VIEWS[(idx + 1) % VIEWS.length];
+      });
+    }
+    if (key.rightArrow) {
+      setActiveView(prev => {
+        const idx = VIEWS.indexOf(prev);
+        return VIEWS[(idx - 1 + VIEWS.length) % VIEWS.length];
+      });
+    }
+  });
+
+  const openPromptFile = useCallback((workflow: LoadedWorkflowConfig) => {
+    openWorkflowPromptFile(workflow, promptsDirectory);
+  }, [promptsDirectory]);
+
+  const { log, workflowStats, runManual } = useIndexWatcher(
     services,
     workflows,
-    store,
     promptsDirectory,
   );
 
@@ -37,9 +62,32 @@ export function Dashboard({ services, workflows, workflowErrors, promptsDirector
 
   return (
     <Box flexDirection="column" width={columns} overflow="hidden">
-      <Text color="gray"> eml v{VERSION}</Text>
-      <WorkflowsPanel workflows={workflows} errors={workflowErrors} workflowStats={workflowStats} width={panelWidth} />
-      <LogPanel entries={log} width={panelWidth} />
+      <Box gap={2}>
+        <Text color="gray"> eml v{VERSION}</Text>
+        {VIEWS.map(view => (
+          <Text key={view} bold={activeView === view} color={activeView === view ? VIEW_COLOR[view] : 'gray'}>
+            {view}
+          </Text>
+        ))}
+      </Box>
+
+      <Box marginTop={1}>
+        {activeView === 'log' && (
+          <LogPanel entries={log} width={panelWidth} />
+        )}
+
+        {activeView === 'workflows' && (
+          <WorkflowsPanel
+            workflows={workflows}
+            errors={workflowErrors}
+            workflowStats={workflowStats}
+            width={panelWidth}
+            onRunWorkflow={runManual}
+            onOpenPromptFile={openPromptFile}
+            onDialogOpenChange={setWorkflowDialogOpen}
+          />
+        )}
+      </Box>
     </Box>
   );
 }

@@ -36,6 +36,7 @@ export function useWorkflows(workflowsDirectory: string): WorkflowsState {
       }
     }
 
+    workflows.sort((a, b) => a.name.localeCompare(b.name));
     setState({ workflows, errors });
   }, [workflowsDirectory]);
 

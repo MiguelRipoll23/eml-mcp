@@ -16,6 +16,7 @@ const searchSchema = {
   dateTo: z.string().optional().describe('ISO 8601 end date'),
   hasAttachments: z.boolean().optional().describe('Only emails with attachments'),
   folder: z.enum(['inbox', 'outbox', 'drafts']).optional().describe('Filter by folder: inbox (received), outbox (sent), or drafts'),
+  filePath: z.string().optional().describe('Filter by file path or filename (partial match, case-sensitive on the path)'),
   limit: z.number().int().min(1).max(200).optional().default(50).describe('Maximum number of results to return (default 50, max 200)'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc').describe('Sort order by date: desc = newest first (default), asc = oldest first'),
 };
@@ -67,6 +68,7 @@ export async function handleSearchEmails(
     dateTo?: string;
     hasAttachments?: boolean;
     folder?: 'inbox' | 'outbox' | 'drafts';
+    filePath?: string;
     limit?: number;
     sortOrder?: 'asc' | 'desc';
   },
@@ -82,6 +84,7 @@ export async function handleSearchEmails(
       dateTo: args.dateTo,
       hasAttachments: args.hasAttachments,
       folder: args.folder,
+      filePath: args.filePath,
     };
     const limit = args.limit ?? 50;
     const sortOrder = args.sortOrder ?? 'desc';

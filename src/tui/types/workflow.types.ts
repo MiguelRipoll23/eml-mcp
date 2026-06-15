@@ -11,6 +11,7 @@ export const WorkflowConfigSchema = z.object({
   conditions: WorkflowConditionsSchema,
   command: z.string(),
   workingDirectory: z.string().optional(),
+  preambleExtra: z.string().optional(),
 });
 
 export type WorkflowConfig = z.infer<typeof WorkflowConfigSchema>;
