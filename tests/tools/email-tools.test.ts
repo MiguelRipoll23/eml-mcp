@@ -65,6 +65,7 @@ function makeServices(overrides: Partial<Services> = {}): Services {
       search: vi.fn().mockReturnValue([mockSearchResult]),
       upsert: vi.fn(),
       count: vi.fn().mockReturnValue(1),
+      getStats: vi.fn().mockReturnValue({ lastIndexedAt: '2026-01-01T00:00:00.000Z' }),
     } as never,
     attachment: {} as never,
     composer: {
@@ -130,6 +131,7 @@ describe('handleSearchEmails', () => {
         search: vi.fn().mockReturnValue([draftResult]),
         count: vi.fn().mockReturnValue(1),
         upsert: vi.fn(),
+        getStats: vi.fn().mockReturnValue({ lastIndexedAt: null }),
       } as never,
     });
     const result = await handleSearchEmails({ folder: 'drafts', limit: 5 }, services);

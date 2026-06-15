@@ -3,7 +3,6 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { FilesystemService } from './services/filesystem-service.js';
 import { EmailParser } from './services/email-parser.js';
 import { IndexService } from './services/index-service.js';
@@ -12,7 +11,8 @@ import { EmailComposer } from './services/email-composer.js';
 import { registerEmailTools } from './tools/email-tools.js';
 import { registerAttachmentTools } from './tools/attachment-tools.js';
 import { registerIndexTools } from './tools/index-tools.js';
-import { DEFAULT_INDEX_DB_PATH } from './constants/paths.js';
+import { getEmlPaths } from './constants/paths.js';
+import { saveConfig } from './tui/services/config-store.js';
 import type { Services } from './types/service.types.js';
 import type { EmailFolder } from './types/email.types.js';
 
@@ -28,9 +28,9 @@ function parseArgs(): {
 
   if (!emailDirectory) {
     process.stderr.write('Usage: eml-mcp <email-directory> [options]\n');
-    process.stderr.write('  email-directory  Root directory; inbox/, outbox/, and drafts/ sub-directories are used\n');
-    process.stderr.write('  --db-path=<path> SQLite index DB path (default: ~/.eml-mcp/index.db)\n');
-    process.stderr.write('  --from=<address> From address for composed drafts (default: draft@eml-mcp)\n');
+    process.stderr.write('  email-directory    Root directory; inbox/, outbox/, and drafts/ sub-directories are used\n');
+    process.stderr.write('  --data-path=<path> Data directory (default: ~/.eml, env: EML_HOME)\n');
+    process.stderr.write('  --from=<address>   From address for composed drafts (default: draft@eml-mcp)\n');
     process.exit(1);
   }
 
@@ -43,13 +43,16 @@ function parseArgs(): {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  const dbPathArg = args.find(arg => arg.startsWith('--db-path='));
-  const indexDbPath = dbPathArg ? dbPathArg.slice('--db-path='.length) : DEFAULT_INDEX_DB_PATH;
+  const dataPathArg = args.find(arg => arg.startsWith('--data-path='));
+  const dataPath = dataPathArg ? dataPathArg.slice('--data-path='.length) : undefined;
+  const emlPaths = getEmlPaths(dataPath);
+
+  saveConfig({ emailDirectory: resolvedRoot }, emlPaths.configPath);
 
   const fromArg = args.find(arg => arg.startsWith('--from='));
   const draftFrom = fromArg ? fromArg.slice('--from='.length) : 'draft@eml-mcp';
 
-  return { inboxDirectory, outboxDirectory, draftsDirectory, indexDbPath, draftFrom };
+  return { inboxDirectory, outboxDirectory, draftsDirectory, indexDbPath: emlPaths.indexDbPath, draftFrom };
 }
 
 async function main(): Promise<void> {

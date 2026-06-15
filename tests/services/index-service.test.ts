@@ -179,6 +179,44 @@ describe('search result shape', () => {
   });
 });
 
+describe('search sortOrder', () => {
+  let service: IndexService;
+
+  beforeEach(async () => {
+    service = new IndexService(':memory:');
+    await service.initialize();
+    service.upsert(makeEntry({ messageId: '<oldest@x.com>', date: '2024-01-01T00:00:00.000Z' }));
+    service.upsert(makeEntry({ messageId: '<middle@x.com>', date: '2025-06-15T00:00:00.000Z' }));
+    service.upsert(makeEntry({ messageId: '<newest@x.com>', date: '2026-03-01T00:00:00.000Z' }));
+  });
+
+  it('defaults to newest-first (desc)', () => {
+    const results = service.search({}, 10);
+    expect(results[0].messageId).toBe('<newest@x.com>');
+    expect(results[2].messageId).toBe('<oldest@x.com>');
+  });
+
+  it('orders ascending when sortOrder is asc', () => {
+    const results = service.search({}, 10, 'asc');
+    expect(results[0].messageId).toBe('<oldest@x.com>');
+    expect(results[2].messageId).toBe('<newest@x.com>');
+  });
+
+  it('orders descending when sortOrder is desc', () => {
+    const results = service.search({}, 10, 'desc');
+    expect(results[0].messageId).toBe('<newest@x.com>');
+    expect(results[2].messageId).toBe('<oldest@x.com>');
+  });
+
+  it('applies sortOrder together with keyword search', () => {
+    service.upsert(makeEntry({ messageId: '<kw-old@x.com>', date: '2023-01-01T00:00:00.000Z', subject: 'sorttest' }));
+    service.upsert(makeEntry({ messageId: '<kw-new@x.com>', date: '2027-01-01T00:00:00.000Z', subject: 'sorttest' }));
+    const asc = service.search({ keyword: 'sorttest' }, 10, 'asc');
+    expect(asc[0].messageId).toBe('<kw-old@x.com>');
+    expect(asc[1].messageId).toBe('<kw-new@x.com>');
+  });
+});
+
 describe('IndexService.count', () => {
   let service: IndexService;
 

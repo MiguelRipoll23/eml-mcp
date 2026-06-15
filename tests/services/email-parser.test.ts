@@ -109,6 +109,182 @@ describe('EmailParser', () => {
     });
   });
 
+  describe('formatAddressText — email-only addresses (no display name)', () => {
+    function buildEml(fromHeader: string, msgId: string): string {
+      return [
+        'MIME-Version: 1.0',
+        `From: ${fromHeader}`,
+        'To: bob@example.com',
+        'Subject: Test',
+        'Date: Thu, 01 Jan 2026 12:00:00 +0000',
+        `Message-ID: <${msgId}>`,
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        'Body',
+      ].join('\r\n');
+    }
+
+    it('returns bare address when there is no display name', async () => {
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(
+        Buffer.from(buildEml('noreply@example.com', 'test-bare@example.com')),
+      );
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('/fake/bare-address.eml');
+
+      expect(result.header.from).toBe('noreply@example.com');
+    });
+
+    it('discards display name that equals the local-part of the address', async () => {
+      // Some clients/servers synthesise a "name" from the local-part, e.g.:
+      //   john.doe <john.doe@example.com>
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(
+        Buffer.from(buildEml('john.doe <john.doe@example.com>', 'test-localpart@example.com')),
+      );
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('/fake/localpart-name.eml');
+
+      expect(result.header.from).toBe('john.doe@example.com');
+    });
+
+    it('discards display name that equals the full email address', async () => {
+      // Some clients use the full address as the display name:
+      //   "user@example.com" <user@example.com>
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(
+        Buffer.from(buildEml('"user@example.com" <user@example.com>', 'test-fulladdr@example.com')),
+      );
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('/fake/fulladdr-name.eml');
+
+      expect(result.header.from).toBe('user@example.com');
+    });
+
+    it('preserves a genuine display name different from the local-part', async () => {
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(
+        Buffer.from(buildEml('John Doe <john.doe@example.com>', 'test-realname@example.com')),
+      );
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('/fake/real-name.eml');
+
+      expect(result.header.from).toBe('John Doe <john.doe@example.com>');
+    });
+  });
+
+  describe('formatAddressText — Exchange comma-separated names', () => {
+    it('quotes display name when it contains a comma (Exchange "APELLIDO, NOMBRE" format)', async () => {
+      const eml = [
+        'MIME-Version: 1.0',
+        'From: "DOE SMITH, JANE ALICE" <jane.doe@example.com>',
+        'To: Bob <bob@example.com>',
+        'Subject: Test comma name',
+        'Date: Thu, 01 Jan 2026 12:00:00 +0000',
+        'Message-ID: <test-comma@example.com>',
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        'Body',
+      ].join('\r\n');
+
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(Buffer.from(eml));
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('/fake/comma-name.eml');
+
+      expect(result.header.from).toBe('"DOE SMITH, JANE ALICE" <jane.doe@example.com>');
+    });
+
+    it('quotes display name when it contains parentheses (Exchange "(ext)" suffix)', async () => {
+      const eml = [
+        'MIME-Version: 1.0',
+        'From: "smith, john (ext)" <john.smith@vendor.example.com>',
+        'To: Bob <bob@example.com>',
+        'Subject: Test paren name',
+        'Date: Thu, 01 Jan 2026 12:00:00 +0000',
+        'Message-ID: <test-paren@example.com>',
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        'Body',
+      ].join('\r\n');
+
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(Buffer.from(eml));
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('/fake/paren-name.eml');
+
+      expect(result.header.from).toBe('"smith, john (ext)" <john.smith@vendor.example.com>');
+    });
+
+    it('does not add quotes for plain multi-word names without special chars', async () => {
+      const eml = [
+        'MIME-Version: 1.0',
+        'From: Jane Alice Doe Smith <jane.doe@example.com>',
+        'To: Bob <bob@example.com>',
+        'Subject: Test plain name',
+        'Date: Thu, 01 Jan 2026 12:00:00 +0000',
+        'Message-ID: <test-plain@example.com>',
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        'Body',
+      ].join('\r\n');
+
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(Buffer.from(eml));
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('/fake/plain-name.eml');
+
+      expect(result.header.from).toBe('Jane Alice Doe Smith <jane.doe@example.com>');
+    });
+  });
+
+  describe('HTML-only files (no MIME headers)', () => {
+    const htmlContent = '<html><head></head><body><p>Hello world</p></body></html>';
+
+    it('returns htmlBody when file is raw HTML with no MIME headers', async () => {
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(Buffer.from(htmlContent));
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('C:\\Outlook\\outbox\\2026-06-10_06-45-09__Test Subject.eml');
+      expect(result.htmlBody).toBeDefined();
+      expect(result.htmlBody).toContain('Hello world');
+    });
+
+    it('extracts subject from filename when headers are absent', async () => {
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(Buffer.from(htmlContent));
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('C:\\Outlook\\outbox\\2026-06-10_06-45-09__Azure Pipelines - SPOT Hidro.eml');
+      expect(result.header.subject).toBe('Azure Pipelines - SPOT Hidro');
+    });
+
+    it('extracts date from filename timestamp when headers are absent', async () => {
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(Buffer.from(htmlContent));
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('C:\\Outlook\\outbox\\2026-06-10_06-45-09__Some Subject.eml');
+      expect(result.header.date.getFullYear()).toBe(2026);
+      expect(result.header.date.getUTCMonth()).toBe(5); // June = 5
+      expect(result.header.date.getUTCDate()).toBe(10);
+    });
+
+    it('generates a synthetic messageId for HTML-only files', async () => {
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(Buffer.from(htmlContent));
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('C:\\Outlook\\outbox\\2026-06-10_06-45-09__Test.eml');
+      expect(result.header.messageId).toMatch(/@eml-mcp>/);
+    });
+
+    it('does not treat a valid MIME file as HTML-only even if body starts with <html>', async () => {
+      const mimeEml = [
+        'MIME-Version: 1.0',
+        'From: alice@example.com',
+        'To: bob@example.com',
+        'Subject: Real Email',
+        'Date: Thu, 10 Jun 2026 10:00:00 +0000',
+        'Message-ID: <real@example.com>',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        htmlContent,
+      ].join('\r\n');
+      vi.spyOn(filesystemService, 'readFile').mockReturnValue(Buffer.from(mimeEml));
+      const freshParser = new EmailParser(filesystemService, 3);
+      const result = await freshParser.parse('/fake/real-mime.eml');
+      expect(result.header.subject).toBe('Real Email');
+      expect(result.header.from).toBe('alice@example.com');
+    });
+  });
+
   describe('parseWithEmbeddedImages', () => {
     it('replaces cid: references in htmlBody with base64 data URIs', async () => {
       const result = await parser.parseWithEmbeddedImages(

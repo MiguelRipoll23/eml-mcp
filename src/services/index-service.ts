@@ -173,7 +173,7 @@ export class IndexService {
     return (rows[0]?.['total'] as number) ?? 0;
   }
 
-  search(filters: SearchFilters, limit: number): SearchResult[] {
+  search(filters: SearchFilters, limit: number, sortOrder: 'asc' | 'desc' = 'desc'): SearchResult[] {
     this.assertInitialized();
     let activeFilters = { ...filters };
 
@@ -183,6 +183,7 @@ export class IndexService {
     }
 
     const { conditions, params } = this.buildConditions(activeFilters);
+    const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
 
     let sql: string;
     let allParams: SqlValue[];
@@ -195,7 +196,7 @@ export class IndexService {
         JOIN emails_meta m ON f.messageId = m.messageId
         WHERE emails_fts MATCH ?
           ${conditions.length ? 'AND ' + conditions.join(' AND ') : ''}
-        ORDER BY m.date DESC
+        ORDER BY m.date ${order}
         LIMIT ?
       `;
       allParams = [activeFilters.keyword, ...params, limit];
@@ -205,7 +206,7 @@ export class IndexService {
                subject, date, hasAttachments, fileSize, indexedAt, folder
         FROM emails_meta m
         ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}
-        ORDER BY date DESC
+        ORDER BY date ${order}
         LIMIT ?
       `;
       allParams = [...params, limit];

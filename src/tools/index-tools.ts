@@ -15,15 +15,24 @@ function folderDirectories(services: Services): Array<{ directory: string; folde
 
 export async function handleRefreshIndex(services: Services) {
   const folders = folderDirectories(services);
-  const diskFiles = new Map<string, EmailFolder>();
+
+  // Single walk — collect all disk files with metadata needed for both removal and stale detection
+  const diskFiles = new Map<string, { folder: EmailFolder; mtime: Date; size: number }>();
   for (const { directory, folder } of folders) {
     for (const file of services.filesystem.walkDirectory(directory)) {
-      diskFiles.set(file.filePath, folder);
+      diskFiles.set(file.filePath, { folder, mtime: file.mtime, size: file.size });
     }
   }
 
   const existing = services.index.getAll() as { messageId: string; filePath: string; indexedAt: string }[];
-  const existingPaths = new Set(existing.map((entry: { filePath: string }) => entry.filePath));
+
+  // Index by filePath for O(1) lookup — avoids the messageId collision problem where
+  // INSERT OR REPLACE on a shared messageId would evict a different file's entry.
+  const existingByPath = new Map<string, { messageId: string; indexedAt: string }>(
+    existing.map(e => [e.filePath, { messageId: e.messageId, indexedAt: e.indexedAt }]),
+  );
+  // Track messageId → filePath to detect duplicates when indexing new files
+  const messageIdToPath = new Map<string, string>(existing.map(e => [e.messageId, e.filePath]));
 
   let added = 0;
   let removed = 0;
@@ -36,26 +45,34 @@ export async function handleRefreshIndex(services: Services) {
     }
   }
 
-  // Rebuild files list with mtime for stale detection
-  const allFiles: Array<{ filePath: string; mtime: Date; size: number; folder: EmailFolder }> = [];
-  for (const { directory, folder } of folders) {
-    for (const file of services.filesystem.walkDirectory(directory)) {
-      allFiles.push({ ...file, folder });
-    }
-  }
-
-  for (const file of allFiles) {
-    const isNew = !existingPaths.has(file.filePath);
-    const existingEntry = existing.find((entry: { filePath: string }) => entry.filePath === file.filePath);
-    const isStale = existingEntry !== undefined && file.mtime > new Date(existingEntry.indexedAt);
+  for (const [filePath, { folder, mtime, size }] of diskFiles) {
+    const existingEntry = existingByPath.get(filePath);
+    const isNew = existingEntry === undefined;
+    const isStale = !isNew && mtime > new Date(existingEntry.indexedAt);
 
     if (!isNew && !isStale) continue;
 
     try {
-      const parsed = await services.parser.parse(file.filePath);
+      const parsed = await services.parser.parse(filePath);
+
+      // Reuse the stored messageId for stale updates so we don't create duplicate entries.
+      // For new files, fall back to a filePath-derived id when the parsed messageId is already
+      // claimed by a different file (duplicate Message-ID headers on forwarded/replied emails).
+      let messageId: string;
+      if (!isNew && existingEntry) {
+        messageId = existingEntry.messageId;
+      } else {
+        messageId = parsed.header.messageId;
+        const conflict = messageIdToPath.get(messageId);
+        if (conflict !== undefined && conflict !== filePath) {
+          messageId = `<path-${Buffer.from(filePath).toString('base64url')}@eml-mcp>`;
+        }
+        messageIdToPath.set(messageId, filePath);
+      }
+
       const indexEntry: IndexEntry = {
-        messageId: parsed.header.messageId,
-        filePath: parsed.header.filePath,
+        messageId,
+        filePath,
         fromAddress: parsed.header.from,
         toAddresses: parsed.header.to.join(', '),
         ccAddresses: parsed.header.cc.join(', '),
@@ -64,9 +81,9 @@ export async function handleRefreshIndex(services: Services) {
         textBody: parsed.textBody ?? '',
         attachmentNames: parsed.attachments.map((a: { filename: string }) => a.filename).join(' '),
         hasAttachments: parsed.attachments.length > 0 ? 1 : 0,
-        fileSize: file.size,
+        fileSize: size,
         indexedAt: new Date().toISOString(),
-        folder: file.folder,
+        folder,
       };
       services.index.upsert(indexEntry);
       isNew ? added++ : updated++;

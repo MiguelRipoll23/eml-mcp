@@ -64,6 +64,12 @@ export class EmailComposer {
       attachments: [...bufferAttachments, ...pathAttachments],
       inReplyTo: options.inReplyTo,
       references: options.references?.join(' '),
+      headers: {
+        // Tells Outlook (and compatible clients) to open this .eml in compose
+        // mode rather than as a received message, avoiding spurious Reply-All
+        // behaviour that would add the From address back as a recipient.
+        'X-Unsent': '1',
+      },
     });
 
     const emailMessageBuffer = info.message as Buffer;
