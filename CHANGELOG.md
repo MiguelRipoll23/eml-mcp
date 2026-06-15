@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.0.0 - 2026-06-15
+
+## What's Changed
+* feat: CLI and TUI by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/10
+* Bump version to v2.0.0-beta.1 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/11
+* fix: remove EML_HOME env var, fix publish workflow trigger by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/12
+* fix: update get-next-version to v3.2.0 by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/13
+* Bump version to v2.0.0-beta.2 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/14
+* fix: add repository field for npm provenance by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/15
+* Bump version to v2.0.0-beta.3 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/16
+* Bump version to v2.0.0 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/17
+
+
+**Full Changelog**: https://github.com/MiguelRipoll23/eml-mcp/compare/v1.3.0...v2.0.0
+
+
 ## v2.0.0-beta.3 - 2026-06-15
 
 ## What's Changed
