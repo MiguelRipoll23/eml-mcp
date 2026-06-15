@@ -14,9 +14,7 @@ export interface EmlPaths {
 export function getEmlPaths(base?: string): EmlPaths {
   const home = base
     ? path.resolve(base)
-    : process.env.EML_HOME
-      ? path.resolve(process.env.EML_HOME)
-      : path.join(os.homedir(), '.eml');
+    : path.join(os.homedir(), '.eml');
 
   return {
     emlHome: home,

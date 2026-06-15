@@ -135,7 +135,7 @@ function printUsage(): void {
   process.stdout.write('  eml-cli stats [<email-directory>] [--data-path=<path>]\n');
   process.stdout.write('  eml-cli last-indexed [--data-path=<path>]\n');
   process.stdout.write('\nOptions:\n');
-  process.stdout.write('  --data-path=<path>  Data directory (default: ~/.eml, env: EML_HOME)\n');
+  process.stdout.write('  --data-path=<path>  Data directory (default: ~/.eml)\n');
   process.stdout.write('\nEmail directory is optional if the MCP server has run at least once.\n');
 }
 

@@ -29,7 +29,7 @@ function parseArgs(): {
   if (!emailDirectory) {
     process.stderr.write('Usage: eml-mcp <email-directory> [options]\n');
     process.stderr.write('  email-directory    Root directory; inbox/, outbox/, and drafts/ sub-directories are used\n');
-    process.stderr.write('  --data-path=<path> Data directory (default: ~/.eml, env: EML_HOME)\n');
+    process.stderr.write('  --data-path=<path> Data directory (default: ~/.eml)\n');
     process.stderr.write('  --from=<address>   From address for composed drafts (default: draft@eml-mcp)\n');
     process.exit(1);
   }

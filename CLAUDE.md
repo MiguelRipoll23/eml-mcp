@@ -31,7 +31,7 @@ All runtime data lives under a single configurable base path (default `~/.eml`):
 | `~/.eml/workflows/` | Workflow JSON definitions |
 | `~/.eml/prompts/` | Prompt templates |
 
-Override with `--data-path=<path>` on any entry point, or set `EML_HOME` env var.
+Override with `--data-path=<path>` on any entry point.
 
 ## Shared Config
 
