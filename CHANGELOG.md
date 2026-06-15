@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.0-beta.1 - 2026-06-15
+
+## What's Changed
+* v2.2.0: CLI overhaul, TUI redesign, workflow enhancements, SQLite processed tracking by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/18
+* Bump version to v2.1.0-beta.1 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/19
+
+
+**Full Changelog**: https://github.com/MiguelRipoll23/eml-mcp/compare/v2.0.0...v2.1.0-beta.1
+
+
 ## v2.2.0 - 2026-06-15
 
 ### Added
