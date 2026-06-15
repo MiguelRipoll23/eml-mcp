@@ -41,7 +41,7 @@ function parseArgs(): {
       process.stderr.write('Run the MCP server first (eml-mcp <email-directory>) or pass the directory explicitly:\n');
       process.stderr.write('  eml <email-directory> [--data-path=<path>]\n');
       process.stderr.write('\nOptions:\n');
-      process.stderr.write('  --data-path=<path>  Data directory (default: ~/.eml, env: EML_HOME)\n');
+      process.stderr.write('  --data-path=<path>  Data directory (default: ~/.eml)\n');
       process.exit(1);
     }
   }

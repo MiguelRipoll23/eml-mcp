@@ -70,56 +70,13 @@ args = ["-y", "eml-mcp", "/path/to/emails", "--from=you@example.com"]
 
 </details>
 
-## Terminal Dashboard (TUI)
-
-```bash
-eml [--data-path=<path>]
-```
-
-Opens an interactive terminal dashboard that watches your email index and runs configured workflows automatically. Panels show active workflows and a live activity log.
-
-The `--data-path` flag (or `EML_HOME` env var) sets the base data directory (default: `~/.eml`). The MCP server must have been started at least once to create the config file — or pass the email directory explicitly via `--data-path`.
-
-## CLI
-
-```bash
-eml-cli <command> [<email-directory>] [--data-path=<path>]
-```
-
-| Command | Description |
-|---|---|
-| `refresh_index` | Sync the index with disk (add new, remove deleted, update changed) |
-| `stats` | Show file counts on disk vs indexed per folder; flags duplicates |
-| `last-indexed` | Show when the index was last updated |
-
-The email directory argument is optional if the MCP server has run at least once (it saves the path to `~/.eml/config.json`).
-
-### Options
-
-| Flag | Description |
-|---|---|
-| `--data-path=<path>` | Base data directory (default: `~/.eml`, env: `EML_HOME`) |
-
-### Examples
-
-```bash
-# Refresh the index
-eml-cli refresh_index
-
-# Check for duplicates or missing files
-eml-cli stats
-
-# Use a custom data directory
-eml-cli stats --data-path=/custom/path
-```
-
 ## Arguments (MCP server)
 
 | Argument | Required | Description |
 |---|---|---|
 | `<email-directory>` | Yes | Root directory; `inbox/`, `outbox/`, and `drafts/` sub-directories must exist inside |
 | `--from=<address>` | No | From address for composed drafts (default: `draft@eml-mcp`) |
-| `--data-path=<path>` | No | Base data directory (default: `~/.eml`, env: `EML_HOME`) |
+| `--data-path=<path>` | No | Base data directory (default: `~/.eml`) |
 
 ## Power Automate — Automatic .eml archiving
 
@@ -182,6 +139,49 @@ eml-mcp will tag these emails as `outbox`.
 | `open_attachment` | Open an attachment with the system default application |
 | `search_attachments` | Find emails containing attachments by filename, type, or keyword |
 | `refresh_index` | Incrementally sync the index with disk state (add new, remove deleted, update changed) |
+
+## Terminal Dashboard (TUI)
+
+```bash
+eml [--data-path=<path>]
+```
+
+Opens an interactive terminal dashboard that watches your email index and runs configured workflows automatically. Panels show active workflows and a live activity log.
+
+The `--data-path` flag sets the base data directory (default: `~/.eml`). The MCP server must have been started at least once to create the config file — or pass the email directory explicitly via `--data-path`.
+
+## CLI
+
+```bash
+eml-cli <command> [<email-directory>] [--data-path=<path>]
+```
+
+| Command | Description |
+|---|---|
+| `refresh_index` | Sync the index with disk (add new, remove deleted, update changed) |
+| `stats` | Show file counts on disk vs indexed per folder; flags duplicates |
+| `last-indexed` | Show when the index was last updated |
+
+The email directory argument is optional if the MCP server has run at least once (it saves the path to `~/.eml/config.json`).
+
+### Options
+
+| Flag | Description |
+|---|---|
+| `--data-path=<path>` | Base data directory (default: `~/.eml`) |
+
+### Examples
+
+```bash
+# Refresh the index
+eml-cli refresh_index
+
+# Check for duplicates or missing files
+eml-cli stats
+
+# Use a custom data directory
+eml-cli stats --data-path=/custom/path
+```
 
 ---
 
