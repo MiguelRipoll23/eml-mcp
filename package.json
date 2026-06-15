@@ -1,6 +1,6 @@
 {
   "name": "eml-mcp",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/MiguelRipoll23/eml-mcp.git"
@@ -27,23 +27,25 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
-    "ink": "^5.2.1",
-    "mailparser": "^3.7.1",
-    "nodemailer": "^6.9.13",
-    "open": "^10.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "citty": "^0.2.2",
+    "ink": "^7.0.6",
+    "ink-text-input": "^6.0.0",
+    "mailparser": "^3.9.10",
+    "nodemailer": "^9.0.0",
+    "open": "^11.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "sql.js": "^1.12.0",
-    "zod": "^3.23.8"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/mailparser": "^3.4.4",
-    "@types/node": "^20.0.0",
-    "@types/nodemailer": "^6.4.14",
-    "@types/react": "^18.3.31",
+    "@types/node": "^22.0.0",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19.2.17",
     "@types/sql.js": "^1.4.9",
-    "tsx": "^4.7.0",
-    "typescript": "^5.4.0",
-    "vitest": "^1.6.0"
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

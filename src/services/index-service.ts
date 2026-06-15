@@ -33,6 +33,13 @@ const CREATE_FTS = `
   )
 `;
 
+const CREATE_PROCESSED_EMAILS = `
+  CREATE TABLE IF NOT EXISTS emails_history (
+    messageId   TEXT PRIMARY KEY,
+    processedAt TEXT NOT NULL
+  )
+`;
+
 type SqlValue = string | number | null | Uint8Array;
 
 export class IndexService {
@@ -60,6 +67,7 @@ export class IndexService {
 
     this.sqlDb.run(CREATE_META);
     this.sqlDb.run(CREATE_FTS);
+    this.sqlDb.run(CREATE_PROCESSED_EMAILS);
   }
 
   private persist(): void {
@@ -127,6 +135,7 @@ export class IndexService {
   private buildConditions(filters: SearchFilters): { conditions: string[]; params: SqlValue[] } {
     const conditions: string[] = [];
     const params: SqlValue[] = [];
+    if (filters.filePath) { conditions.push('m.filePath LIKE ?'); params.push(`%${filters.filePath}%`); }
     if (filters.from) { conditions.push('m.fromAddress LIKE ?'); params.push(`%${filters.from}%`); }
     if (filters.to) { conditions.push('m.toAddresses LIKE ?'); params.push(`%${filters.to}%`); }
     if (filters.subject) { conditions.push('m.subject LIKE ?'); params.push(`%${filters.subject}%`); }
@@ -245,6 +254,21 @@ export class IndexService {
         drafts: folderCounts['drafts'] ?? 0,
       },
     };
+  }
+
+  isProcessed(messageId: string): boolean {
+    this.assertInitialized();
+    const rows = this.query(`SELECT 1 FROM emails_history WHERE messageId = ?`, [messageId]);
+    return rows.length > 0;
+  }
+
+  markProcessed(messageId: string): void {
+    this.assertInitialized();
+    this.sqlDb.run(
+      `INSERT OR IGNORE INTO emails_history (messageId, processedAt) VALUES (?, ?)`,
+      [messageId, new Date().toISOString()],
+    );
+    this.persist();
   }
 
   getAll(): { messageId: string; filePath: string; indexedAt: string }[] {

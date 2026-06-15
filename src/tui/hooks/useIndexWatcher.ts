@@ -1,17 +1,20 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import * as fs from 'fs';
 import type { Services } from '../../types/service.types.js';
 import type { IndexStats } from '../../types/index.types.js';
 import type { LoadedWorkflowConfig, LogEntry, WorkflowRunStats } from '../types/workflow.types.js';
-import { ProcessedStore } from '../services/processed-store.js';
-import { processEmail } from '../services/workflow-runner.js';
+import { processEmail, runWorkflowManually } from '../services/workflow-runner.js';
 import { handleRefreshIndex } from '../../tools/index-tools.js';
 
-export interface WatcherState {
+interface InternalState {
   stats: IndexStats | null;
   log: LogEntry[];
   isRefreshing: boolean;
   workflowStats: Map<string, WorkflowRunStats>;
+}
+
+export interface WatcherState extends InternalState {
+  runManual: (workflow: LoadedWorkflowConfig, customPreamble: string) => Promise<void>;
 }
 
 const MAX_LOG_ENTRIES = 100;
@@ -28,10 +31,9 @@ function appendLog(prev: LogEntry[], entry: LogEntry): LogEntry[] {
 export function useIndexWatcher(
   services: Services,
   workflows: LoadedWorkflowConfig[],
-  store: ProcessedStore,
   promptsDirectory: string,
 ): WatcherState {
-  const [state, setState] = useState<WatcherState>({
+  const [state, setState] = useState<InternalState>({
     stats: null,
     log: [],
     isRefreshing: false,
@@ -40,6 +42,43 @@ export function useIndexWatcher(
 
   const workflowsRef = useRef(workflows);
   workflowsRef.current = workflows;
+
+  const promptsDirRef = useRef(promptsDirectory);
+  promptsDirRef.current = promptsDirectory;
+
+  const runManual = useCallback(async (workflow: LoadedWorkflowConfig, customPreamble: string) => {
+    try {
+      await runWorkflowManually(workflow, customPreamble, promptsDirRef.current);
+      const nowIso = new Date().toISOString();
+      const nowDisplay = timestamp();
+      setState(prev => {
+        const newStats = new Map(prev.workflowStats);
+        const existing = newStats.get(workflow.name) ?? { lastRunAt: null, runCount: 0 };
+        newStats.set(workflow.name, {
+          lastRunAt: nowIso,
+          runCount: existing.runCount + 1,
+        });
+        return {
+          ...prev,
+          workflowStats: newStats,
+          log: appendLog(prev.log, {
+            time: nowDisplay,
+            message: `Workflow started (manual): ${workflow.name}`,
+            kind: 'workflow',
+          }),
+        };
+      });
+    } catch (err) {
+      setState(prev => ({
+        ...prev,
+        log: appendLog(prev.log, {
+          time: timestamp(),
+          message: `Error running workflow manually: ${err instanceof Error ? err.message : String(err)}`,
+          kind: 'error',
+        }),
+      }));
+    }
+  }, []);
 
   const isFirstRun = useRef(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,7 +92,7 @@ export function useIndexWatcher(
         if (wasFirstRun) {
           const preExisting = services.index.getAll();
           for (const entry of preExisting) {
-            if (!store.has(entry.messageId)) store.mark(entry.messageId);
+            if (!services.index.isProcessed(entry.messageId)) services.index.markProcessed(entry.messageId);
           }
           isFirstRun.current = false;
         }
@@ -75,7 +114,7 @@ export function useIndexWatcher(
         });
 
         const allIndexed = services.index.getAll();
-        const unprocessed = allIndexed.filter(entry => !store.has(entry.messageId));
+        const unprocessed = allIndexed.filter(entry => !services.index.isProcessed(entry.messageId));
 
         for (const entry of unprocessed) {
           try {
@@ -83,7 +122,7 @@ export function useIndexWatcher(
               entry.filePath,
               workflowsRef.current,
               services.parser,
-              store,
+              services.index,
               promptsDirectory,
             );
 
@@ -99,19 +138,20 @@ export function useIndexWatcher(
             }));
 
             for (const match of processed.matches) {
-              const now = timestamp();
+              const nowIso = new Date().toISOString();
+              const nowDisplay = timestamp();
               setState(prev => {
                 const newStats = new Map(prev.workflowStats);
                 const existing = newStats.get(match.workflowName) ?? { lastRunAt: null, runCount: 0 };
                 newStats.set(match.workflowName, {
-                  lastRunAt: now,
+                  lastRunAt: nowIso,
                   runCount: existing.runCount + 1,
                 });
                 return {
                   ...prev,
                   workflowStats: newStats,
                   log: appendLog(prev.log, {
-                    time: now,
+                    time: nowDisplay,
                     message: `Workflow started: ${match.workflowName}`,
                     kind: 'workflow',
                   }),
@@ -170,5 +210,5 @@ export function useIndexWatcher(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return state;
+  return { ...state, runManual };
 }

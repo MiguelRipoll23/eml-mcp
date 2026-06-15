@@ -122,10 +122,6 @@ async function main(): Promise<void> {
   await index.initialize();
 
   const { workflows, errors } = loadWorkflows(workflowsDirectory);
-  const processedStorePath = path.join(path.dirname(indexDbPath), 'processed.json');
-
-  process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H'); // enter alternate screen, clear, cursor home
-  const restoreScreen = () => process.stdout.write('\x1b[?1049l');
 
   const { waitUntilExit, unmount } = render(
     <Dashboard
@@ -133,15 +129,16 @@ async function main(): Promise<void> {
       workflows={workflows}
       workflowErrors={errors}
       promptsDirectory={promptsDirectory}
-      processedStorePath={processedStorePath}
     />,
+    { alternateScreen: true },
   );
 
-  const cleanup = () => { unmount(); restoreScreen(); };
+  process.stdout.write('\x1b[2J\x1b[H'); // clear alternate screen + cursor home
+
+  const cleanup = () => unmount();
   process.once('SIGTERM', cleanup);
   process.once('SIGINT', cleanup);
   await waitUntilExit();
-  restoreScreen();
 }
 
 main().catch(error => {

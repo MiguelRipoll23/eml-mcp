@@ -1,5 +1,50 @@
 # Changelog
 
+## v2.2.0 - 2026-06-15
+
+### Added
+- **`eml-cli workflow` subcommands**: `list`, `get`, `create`, `update`, `delete`, `help` — full CRUD for workflow JSON files from the command line. `create` and `update` accept `--prompt=<text>` to write the prompt template to `~/.eml/prompts/<slug>.md` in the same operation.
+- **citty** adopted as the CLI argument parsing library — replaces manual string parsing with typed, self-documenting command definitions and built-in `--help` output for every command and subcommand.
+- **`emails_history` table in `index.db`**: processed email message IDs are now stored in the SQLite database (`messageId`, `processedAt`) instead of a separate `processed.json` file. The file is no longer created or read.
+
+### Changed
+- CLI commands renamed to kebab-case for consistency: `refresh_index` → `refresh-index`.
+- Removed keyboard hints from the TUI header bar.
+
+### Removed
+- `processed.json` (`~/.eml/processed.json`) — superseded by the `emails_history` table in `index.db`.
+
+---
+
+## v2.1.0 - 2026-06-15
+
+### Added
+- **Manual workflow run**: In the Workflows tab, press `Enter` on a selected workflow to open an inline run dialog. Type or paste issue text (e.g. from a chat message), then press `Enter` to run the workflow without an email file. The typed text is used as the full preamble, replacing both the email-fetch preamble and any `preambleExtra`. Press `Escape` to cancel. Log entries and workflow stats update the same as auto-triggered runs.
+- Workflows tab keyboard hints updated: `[tab/←→] switch  [↑↓] select  [enter] run`.
+- Workflow config supports optional `preambleExtra` field to append workflow-specific context (e.g. "only process if addressed to me") to the injected preamble.
+- **Workflows panel scroll**: ↑/↓ keys scroll through workflow cards when content exceeds terminal height; `↑ N more` / `↓ N more` indicators show when content is clipped.
+
+### Changed
+- TUI workflow runner now injects a structured preamble with the email filename before the rendered prompt, instructing Claude to locate the email via `search_emails` and retrieve full content via `get_email`.
+- Preamble now filters by `folder: "inbox"` and `filePath` (filename only) instead of full file path; includes workflow keywords for related-email searches.
+- Prompt files cleaned up — email-fetching boilerplate removed; files now contain only domain-specific instructions.
+- `search_emails` now accepts a `filePath` filter (partial match) for looking up emails by filename or path.
+- All workflow prompts updated to use MCP tools (`search_emails` + `get_email`) as the authoritative email source instead of relying solely on inline template-rendered content.
+- Workflows panel now sorts workflows alphabetically by name.
+- Renamed `conditions:` label to `keywords:` in the workflows panel.
+- Keywords now wrap instead of truncating in the workflows panel.
+- TUI split into two keyboard-navigable views (`log` / `workflows`) switched with Tab, left arrow, or right arrow.
+- Log view shows only the activity log; workflows view shows the full detail panel.
+- Workflow last-run times displayed as relative (e.g. `just now`, `5m ago`, `2h ago`, `yesterday`), refreshing every 30 s.
+- Removed panel borders and titles; tab bar provides navigation context.
+- Added blank line between header and content; left-aligned content with header.
+- Added vertical spacing between workflow entries; removed bullet dash prefix.
+- `log` tab label coloured pink when active; `workflows` tab label coloured blue when active.
+- Workflow names coloured white; attribute labels (`keywords:`, `working directory:`, `last run:`) coloured blue; attribute values coloured green.
+- TUI now uses ink's built-in `alternateScreen` option instead of manual ANSI escape sequences; terminal content is restored cleanly on exit.
+- Terminal width now tracked live via `useWindowSize` — the TUI reflows correctly when the terminal is resized.
+- All dependencies updated to latest versions (ink 7, React 19, nodemailer 9, zod 4, TypeScript 6, vitest 4, and more).
+
 ## v2.0.0 - 2026-06-15
 
 ## What's Changed
