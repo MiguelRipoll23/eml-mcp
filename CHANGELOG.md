@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.0 - 2026-06-19
+
+## What's Changed
+* feat: global and per-workflow disallowed words, word-boundary matching, activity log improvements by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/21
+* Bump version to v2.2.0 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/22
+
+
+**Full Changelog**: https://github.com/MiguelRipoll23/eml-mcp/compare/v2.1.0...v2.2.0
+
+
 ## v2.4.1 - 2026-06-17
 
 ### Changed
