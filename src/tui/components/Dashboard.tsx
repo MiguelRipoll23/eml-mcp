@@ -24,9 +24,10 @@ interface DashboardProps {
   workflows: LoadedWorkflowConfig[];
   workflowErrors: string[];
   promptsDirectory: string;
+  disallowedWordsPath: string;
 }
 
-export function Dashboard({ services, workflows, workflowErrors, promptsDirectory }: DashboardProps) {
+export function Dashboard({ services, workflows, workflowErrors, promptsDirectory, disallowedWordsPath }: DashboardProps) {
   const { columns } = useWindowSize();
 
   const [activeView, setActiveView] = useState<ActiveView>('log');
@@ -56,6 +57,7 @@ export function Dashboard({ services, workflows, workflowErrors, promptsDirector
     services,
     workflows,
     promptsDirectory,
+    disallowedWordsPath,
   );
 
   const panelWidth = Math.min(columns, 72);
@@ -69,6 +71,11 @@ export function Dashboard({ services, workflows, workflowErrors, promptsDirector
             {view}
           </Text>
         ))}
+        <Text color="gray">
+          {activeView === 'workflows'
+            ? '[enter] run  [p] prompt'
+            : '[tab/←→]'}
+        </Text>
       </Box>
 
       <Box marginTop={1}>

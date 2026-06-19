@@ -9,6 +9,7 @@ import { AttachmentService } from './services/attachment-service.js';
 import { EmailComposer } from './services/email-composer.js';
 import { getEmlPaths } from './constants/paths.js';
 import { loadConfig } from './tui/services/config-store.js';
+import { loadDisallowedWords, saveDisallowedWords } from './tui/services/disallowed-words-store.js';
 import { handleRefreshIndex } from './tools/index-tools.js';
 import { WorkflowConfigSchema } from './tui/types/workflow.types.js';
 import type { Services } from './types/service.types.js';
@@ -131,6 +132,79 @@ const indexCommand = defineCommand({
   subCommands: {
     refresh: indexRefreshCommand,
     status: indexStatusCommand,
+  },
+});
+
+const disallowedWordsListCommand = defineCommand({
+  meta: { name: 'disallowed-words list', description: 'List global disallowed words' },
+  args: { ...DATA_PATH_ARG },
+  run({ args }) {
+    const emlPaths = getEmlPaths(args['data-path']);
+    const words = loadDisallowedWords(emlPaths.disallowedWordsPath);
+    if (words.length === 0) {
+      process.stdout.write('No global disallowed words configured.\n');
+      return;
+    }
+    for (const word of words) {
+      process.stdout.write(`${word}\n`);
+    }
+  },
+});
+
+const disallowedWordsAddCommand = defineCommand({
+  meta: { name: 'disallowed-words add', description: 'Add a global disallowed word' },
+  args: {
+    word: { type: 'positional', description: 'Word to add', required: true },
+    ...DATA_PATH_ARG,
+  },
+  run({ args }) {
+    const emlPaths = getEmlPaths(args['data-path']);
+    const words = loadDisallowedWords(emlPaths.disallowedWordsPath);
+    if (words.includes(args.word)) {
+      process.stdout.write(`Already present: ${args.word}\n`);
+      return;
+    }
+    saveDisallowedWords([...words, args.word], emlPaths.disallowedWordsPath);
+    process.stdout.write(`Added: ${args.word}\n`);
+  },
+});
+
+const disallowedWordsRemoveCommand = defineCommand({
+  meta: { name: 'disallowed-words remove', description: 'Remove a global disallowed word' },
+  args: {
+    word: { type: 'positional', description: 'Word to remove', required: true },
+    ...DATA_PATH_ARG,
+  },
+  run({ args }) {
+    const emlPaths = getEmlPaths(args['data-path']);
+    const words = loadDisallowedWords(emlPaths.disallowedWordsPath);
+    const filtered = words.filter(w => w !== args.word);
+    if (filtered.length === words.length) {
+      process.stdout.write(`Not found: ${args.word}\n`);
+      return;
+    }
+    saveDisallowedWords(filtered, emlPaths.disallowedWordsPath);
+    process.stdout.write(`Removed: ${args.word}\n`);
+  },
+});
+
+const disallowedWordsClearCommand = defineCommand({
+  meta: { name: 'disallowed-words clear', description: 'Remove all global disallowed words' },
+  args: { ...DATA_PATH_ARG },
+  run({ args }) {
+    const emlPaths = getEmlPaths(args['data-path']);
+    saveDisallowedWords([], emlPaths.disallowedWordsPath);
+    process.stdout.write('All global disallowed words removed.\n');
+  },
+});
+
+const disallowedWordsCommand = defineCommand({
+  meta: { name: 'disallowed-words', description: 'Manage global disallowed words' },
+  subCommands: {
+    list: disallowedWordsListCommand,
+    add: disallowedWordsAddCommand,
+    remove: disallowedWordsRemoveCommand,
+    clear: disallowedWordsClearCommand,
   },
 });
 
@@ -313,6 +387,7 @@ const main = defineCommand({
   subCommands: {
     index: indexCommand,
     workflow: workflowCommand,
+    'disallowed-words': disallowedWordsCommand,
   },
 });
 

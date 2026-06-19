@@ -12,6 +12,7 @@ describe('getEmlPaths', () => {
     expect(p.configPath).toBe(path.join(expected, 'config.json'));
     expect(p.workflowsDir).toBe(path.join(expected, 'workflows'));
     expect(p.promptsDir).toBe(path.join(expected, 'prompts'));
+    expect(p.disallowedWordsPath).toBe(path.join(expected, 'disallowed-words.json'));
   });
 
   it('resolves explicit base argument', () => {
@@ -22,5 +23,12 @@ describe('getEmlPaths', () => {
     expect(p.configPath).toBe(path.join(base, 'config.json'));
     expect(p.workflowsDir).toBe(path.join(base, 'workflows'));
     expect(p.promptsDir).toBe(path.join(base, 'prompts'));
+    expect(p.disallowedWordsPath).toBe(path.join(base, 'disallowed-words.json'));
+  });
+
+  it('includes disallowedWordsPath under emlHome', () => {
+    const base = path.resolve('tmp/test-eml');
+    const p = getEmlPaths('tmp/test-eml');
+    expect(p.disallowedWordsPath).toBe(path.join(base, 'disallowed-words.json'));
   });
 });

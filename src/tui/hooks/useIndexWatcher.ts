@@ -4,6 +4,7 @@ import type { Services } from '../../types/service.types.js';
 import type { IndexStats } from '../../types/index.types.js';
 import type { LoadedWorkflowConfig, LogEntry, WorkflowRunStats } from '../types/workflow.types.js';
 import { processEmail, runWorkflowManually } from '../services/workflow-runner.js';
+import { loadDisallowedWords } from '../services/disallowed-words-store.js';
 import { handleRefreshIndex } from '../../tools/index-tools.js';
 
 interface InternalState {
@@ -32,6 +33,7 @@ export function useIndexWatcher(
   services: Services,
   workflows: LoadedWorkflowConfig[],
   promptsDirectory: string,
+  disallowedWordsPath: string,
 ): WatcherState {
   const [state, setState] = useState<InternalState>({
     stats: null,
@@ -90,7 +92,7 @@ export function useIndexWatcher(
 
       try {
         if (wasFirstRun) {
-          const preExisting = services.index.getAll();
+          const preExisting = services.index.getAll('inbox');
           for (const entry of preExisting) {
             if (!services.index.isProcessed(entry.messageId)) services.index.markProcessed(entry.messageId);
           }
@@ -113,8 +115,10 @@ export function useIndexWatcher(
           return { ...prev, stats, isRefreshing: false, log };
         });
 
-        const allIndexed = services.index.getAll();
+        const allIndexed = services.index.getAll('inbox');
         const unprocessed = allIndexed.filter(entry => !services.index.isProcessed(entry.messageId));
+
+        const globalDisallowedWords = loadDisallowedWords(disallowedWordsPath);
 
         for (const entry of unprocessed) {
           try {
@@ -124,18 +128,45 @@ export function useIndexWatcher(
               services.parser,
               services.index,
               promptsDirectory,
+              globalDisallowedWords,
             );
 
             if (processed === null) continue;
 
+            const rawSubject = processed.subject || processed.filePath;
+            const subject = rawSubject.length > 50 ? rawSubject.slice(0, 47) + '…' : rawSubject;
             setState(prev => ({
               ...prev,
               log: appendLog(prev.log, {
                 time: timestamp(),
-                message: `"${processed.subject || processed.filePath}"`,
+                message: `Email: "${subject}"`,
                 kind: 'found',
               }),
             }));
+
+            if (processed.globalSkip) {
+              const words = processed.globalSkip.disallowedWordsFound.map(w => `"${w}"`).join(', ');
+              setState(prev => ({
+                ...prev,
+                log: appendLog(prev.log, {
+                  time: timestamp(),
+                  message: `[Global] Ignored — disallowed word: ${words}`,
+                  kind: 'global-skip',
+                }),
+              }));
+            }
+
+            for (const skip of processed.skips) {
+              const words = skip.disallowedWordsFound.map(w => `"${w}"`).join(', ');
+              setState(prev => ({
+                ...prev,
+                log: appendLog(prev.log, {
+                  time: timestamp(),
+                  message: `[${skip.workflowName}] Skipped — disallowed word: ${words}`,
+                  kind: 'skipped',
+                }),
+              }));
+            }
 
             for (const match of processed.matches) {
               const nowIso = new Date().toISOString();
@@ -147,10 +178,15 @@ export function useIndexWatcher(
                   lastRunAt: nowIso,
                   runCount: existing.runCount + 1,
                 });
+                const withKeywords = appendLog(prev.log, {
+                  time: nowDisplay,
+                  message: `Keywords: ${match.matchedKeywords.join(', ')}`,
+                  kind: 'keywords',
+                });
                 return {
                   ...prev,
                   workflowStats: newStats,
-                  log: appendLog(prev.log, {
+                  log: appendLog(withKeywords, {
                     time: nowDisplay,
                     message: `Workflow started: ${match.workflowName}`,
                     kind: 'workflow',
@@ -187,18 +223,16 @@ export function useIndexWatcher(
       debounceRef.current = setTimeout(run, DEBOUNCE_MS);
     };
 
-    const { inboxDirectory, outboxDirectory, draftsDirectory } = services.config;
+    const { inboxDirectory } = services.config;
     const watchers: fs.FSWatcher[] = [];
     let mounted = true;
 
     run().finally(() => {
       if (!mounted) return;
-      for (const dir of [inboxDirectory, outboxDirectory, draftsDirectory]) {
-        try {
-          watchers.push(fs.watch(dir, scheduleRun));
-        } catch {
-          // Directory may not exist yet
-        }
+      try {
+        watchers.push(fs.watch(inboxDirectory, scheduleRun));
+      } catch {
+        // Directory may not exist yet
       }
     });
 

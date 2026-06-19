@@ -1,14 +1,52 @@
 # Changelog
 
-## v2.1.0-beta.1 - 2026-06-15
+## v2.4.1 - 2026-06-17
 
-## What's Changed
-* v2.2.0: CLI overhaul, TUI redesign, workflow enhancements, SQLite processed tracking by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/18
-* Bump version to v2.1.0-beta.1 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/19
+### Changed
+- **Activity log — clearer skip messages**: disallowed-word skip entries now show the scope and word explicitly.
+  - Global skip: `[Global] Ignored — disallowed word: "word"`
+  - Workflow skip: `[WorkflowName] Skipped — disallowed word: "word"`
 
+---
 
-**Full Changelog**: https://github.com/MiguelRipoll23/eml-mcp/compare/v2.0.0...v2.1.0-beta.1
+## v2.4.0 - 2026-06-16
 
+### Added
+- **Global disallowed words**: a persistent list stored at `~/.eml/disallowed-words.json` that prevents any workflow from running when a matching word is found in an email's subject or body.
+- **Activity log — global-skip line**: a `Skipped globally: <word> found` entry (yellow) is logged when an email is blocked by the global disallowed words list.
+- **CLI commands**: `eml-cli disallowed-words list|add|remove|clear` to manage the global disallowed words list.
+
+---
+
+## v2.3.0 - 2026-06-16
+
+### Added
+- **`disallowedWords` in workflow config**: optional array of strings; if any disallowed word appears in the email (checked against the same fields as `conditions.fields`), the workflow is skipped for that email.
+- **Activity log — keywords line**: a `Keywords: <kw1>, <kw2>` entry (green) is logged immediately before each `Workflow started` entry, showing which keywords triggered the match.
+- **Activity log — skipped line**: a `Skipped "<name>": <word> found` entry (yellow) is logged when a workflow is blocked by a disallowed word.
+- **Workflows panel — disallowed words row**: workflows with `disallowedWords` now show a `disallowed words:` row in the detail card.
+
+---
+
+## v2.2.2 - 2026-06-16
+
+### Fixed
+- **Terminal launch**: `wt.exe` now receives `new-tab -d <workingDirectory>` arguments — the previous invocation had no `new-tab` subcommand and passed the working directory via the spawn `cwd` option instead of the `-d` flag, so the terminal never opened.
+- **Terminal errors surface to log**: spawn failures (e.g. bad path, `wt.exe` not found) now propagate through a Promise and appear as error entries in the activity log instead of being silently swallowed.
+
+### Changed
+- **Activity log order**: entries are now displayed oldest-first (top) to newest-last (bottom), matching natural reading order. The log auto-follows the bottom on new entries; scrolling up pauses follow mode and scrolling back to the bottom resumes it.
+
+---
+
+## v2.2.1 - 2026-06-16
+
+### Fixed
+- Watcher and workflow processing now observe **inbox only** — outbox and drafts directories are no longer watched or processed.
+- When multiple workflows match the same item, only the one(s) with the **highest keyword match count** run; lower-scoring workflows are skipped.
+- Log "found" entries now show `Email: "<subject>"` with the subject truncated to 50 characters to prevent cropping.
+
+---
 
 ## v2.2.0 - 2026-06-15
 
@@ -101,22 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **CLI utility** (`eml-cli`): `refresh_index` and `stats` commands for headless operations — refreshing the email index and comparing on-disk vs indexed counts per folder.
-- **Terminal UI** (`eml` / `eml-tui`): Ink-based interactive dashboard for watching email directories, running workflows, and managing `.eml` files directly from the terminal.
-- **`search_emails`: `sortOrder` parameter**: accepts `"asc"` or `"desc"` (default `"desc"`), controlling whether results are returned newest-first or oldest-first. Applied to both plain and full-text keyword searches.
-- **`search_emails`: `indexLastRefreshedAt` field**: the response now includes the ISO timestamp of the last time any email was indexed, so the caller can tell whether the index may be stale before relying on the results.
-
-### Fixed
-
-- **HTML-only `.eml` files not parsed (Outlook-exported emails)**: Outlook sometimes saves sent emails as raw HTML files with a `.eml` extension instead of proper MIME format. The parser now detects this case (file content starts with `<` and has no RFC 2822 headers) and wraps the content in a minimal MIME envelope so the HTML body is correctly extracted. Subject and date are recovered from the filename timestamp pattern `YYYY-MM-DD_HH-MM-SS__Subject.eml` when MIME headers are absent. This fixes both `get_email` (returned empty headers and no body) and `refresh_index` (indexed these files with epoch date `1970-01-01`, making them invisible to date-filtered searches).
-- **Full name truncated when replying to Exchange emails**: display names in `APELLIDO, NOMBRE` format (e.g. `DOE SMITH, JANE ALICE`) were returned unquoted by `formatAddressText`, causing nodemailer's address parser to split on the comma and discard the surname tokens. `formatAddressText` now wraps names containing RFC 2822 special characters (`,`, `;`, `(`, `)`, `<`, `>`, etc.) in double quotes, preserving the full name through the compose pipeline.
-- **Synthetic display name used instead of bare address**: some clients/servers populate the display name with the local-part of the address (e.g. `john.doe` for `john.doe@company.com`) or repeat the full address as the display name. `formatAddressText` now discards a display name that is identical to the local-part or the full address, returning just the bare address instead.
-- **Outlook adds the user as a recipient when doing Reply All on a draft**: composed `.eml` drafts did not carry `X-Unsent: 1`, so Outlook opened them as received messages. When the user clicked Reply All, Outlook included the `From` address (the user's own address) as a new recipient. All drafts now include `X-Unsent: 1`, instructing Outlook to open the file directly in compose mode.
-
-### Changed
-
-- `formatDateLocal` now uses the server's runtime locale and timezone (`Intl.DateTimeFormat().resolvedOptions()`) instead of hardcoded `es-ES` / `Europe/Madrid`.
-- `search_emails` results now include a `dateLocal` field formatted in the server's local locale and timezone.
+- **TUI keyboard hints**: the tab bar now shows `[enter] run  [p] prompt` when on the workflows view, indicating the available actions for workflow items.
 
 ---
 
