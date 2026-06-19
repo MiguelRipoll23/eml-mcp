@@ -22,6 +22,7 @@ function parseArgs(): {
   indexDbPath: string;
   workflowsDirectory: string;
   promptsDirectory: string;
+  disallowedWordsPath: string;
 } {
   const args = process.argv.slice(2);
   const emailDirectoryArg = args.find(arg => !arg.startsWith('--'));
@@ -70,6 +71,7 @@ function parseArgs(): {
     indexDbPath: emlPaths.indexDbPath,
     workflowsDirectory: emlPaths.workflowsDir,
     promptsDirectory: emlPaths.promptsDir,
+    disallowedWordsPath: emlPaths.disallowedWordsPath,
   };
 }
 
@@ -102,7 +104,7 @@ function loadWorkflows(workflowsDirectory: string): { workflows: LoadedWorkflowC
 }
 
 async function main(): Promise<void> {
-  const { inboxDirectory, outboxDirectory, draftsDirectory, indexDbPath, workflowsDirectory, promptsDirectory } = parseArgs();
+  const { inboxDirectory, outboxDirectory, draftsDirectory, indexDbPath, workflowsDirectory, promptsDirectory, disallowedWordsPath } = parseArgs();
 
   const filesystem = new FilesystemService();
   const parser = new EmailParser(filesystem);
@@ -129,6 +131,7 @@ async function main(): Promise<void> {
       workflows={workflows}
       workflowErrors={errors}
       promptsDirectory={promptsDirectory}
+      disallowedWordsPath={disallowedWordsPath}
     />,
     { alternateScreen: true },
   );

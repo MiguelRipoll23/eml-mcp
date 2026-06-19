@@ -271,9 +271,11 @@ export class IndexService {
     this.persist();
   }
 
-  getAll(): { messageId: string; filePath: string; indexedAt: string }[] {
+  getAll(folder?: string): { messageId: string; filePath: string; indexedAt: string }[] {
     this.assertInitialized();
-    const rows = this.query(`SELECT messageId, filePath, indexedAt FROM emails_meta`);
+    const rows = folder
+      ? this.query(`SELECT messageId, filePath, indexedAt FROM emails_meta WHERE folder = ?`, [folder])
+      : this.query(`SELECT messageId, filePath, indexedAt FROM emails_meta`);
     return rows as unknown as { messageId: string; filePath: string; indexedAt: string }[];
   }
 

@@ -16,17 +16,18 @@ function isDefaultFields(fields: string[]): boolean {
 }
 
 function cardRows(wf: LoadedWorkflowConfig, isFirst: boolean): number {
-  return (isFirst ? 0 : 1)                          // gap between cards
-    + 1                                              // name
-    + 1                                              // "keywords:" label
-    + 1                                              // keywords value
-    + (!isDefaultFields(wf.conditions.fields) ? 2 : 0) // optional fields (label + value)
-    + 1                                              // "command:" label
-    + 1                                              // command value
-    + (wf.workingDirectory ? 2 : 0)                 // optional working directory (label + value)
-    + (wf.preambleExtra ? 2 : 0)                    // optional prompt (label + value)
-    + 1                                              // "last run:" label
-    + 1;                                             // last run value
+  return (isFirst ? 0 : 1)                                      // gap between cards
+    + 1                                                          // name
+    + 1                                                          // "keywords:" label
+    + 1                                                          // keywords value
+    + (!isDefaultFields(wf.conditions.fields) ? 2 : 0)          // optional fields (label + value)
+    + (wf.disallowedWords?.length ? 2 : 0)                      // optional disallowed words (label + value)
+    + 1                                                          // "command:" label
+    + 1                                                          // command value
+    + (wf.workingDirectory ? 2 : 0)                             // optional working directory (label + value)
+    + (wf.preambleExtra ? 2 : 0)                                // optional prompt (label + value)
+    + 1                                                          // "last run:" label
+    + 1;                                                         // last run value
 }
 
 function computeVisibleCount(
@@ -172,6 +173,14 @@ export function WorkflowsPanel({ workflows, errors, workflowStats, width, onRunW
                 <Text color={BLUE}>fields:</Text>
                 <Box paddingLeft={2}>
                   <Text color={GREEN}>{wf.conditions.fields.join(', ')}</Text>
+                </Box>
+              </Box>
+            )}
+            {wf.disallowedWords?.length && (
+              <Box flexDirection="column" paddingLeft={2}>
+                <Text color={BLUE}>disallowed words:</Text>
+                <Box paddingLeft={2}>
+                  <Text color={GREEN} wrap="wrap">{wf.disallowedWords.join(', ')}</Text>
                 </Box>
               </Box>
             )}

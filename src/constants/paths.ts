@@ -9,6 +9,7 @@ export interface EmlPaths {
   configPath: string;
   workflowsDir: string;
   promptsDir: string;
+  disallowedWordsPath: string;
 }
 
 export function getEmlPaths(base?: string): EmlPaths {
@@ -22,5 +23,6 @@ export function getEmlPaths(base?: string): EmlPaths {
     configPath: path.join(home, 'config.json'),
     workflowsDir: path.join(home, 'workflows'),
     promptsDir: path.join(home, 'prompts'),
+    disallowedWordsPath: path.join(home, 'disallowed-words.json'),
   };
 }

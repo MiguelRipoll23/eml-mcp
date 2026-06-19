@@ -6,7 +6,10 @@ import * as os from 'os';
 import type { LoadedWorkflowConfig } from '../../../src/tui/types/workflow.types.js';
 
 const mockUnref = vi.fn();
-const mockSpawn = vi.fn().mockReturnValue({ unref: mockUnref });
+const mockOn = vi.fn().mockImplementation((event: string, cb: () => void) => {
+  if (event === 'spawn') cb();
+});
+const mockSpawn = vi.fn().mockReturnValue({ on: mockOn, unref: mockUnref });
 
 vi.mock('child_process', () => ({
   spawn: (...args: unknown[]) => mockSpawn(...args),
@@ -53,6 +56,7 @@ describe('runWorkflowManually', () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'eml-test-'));
     mockSpawn.mockClear();
     mockUnref.mockClear();
+    mockOn.mockClear();
   });
 
   afterEach(() => {
@@ -138,8 +142,8 @@ describe('runWorkflowManually', () => {
 
     expect(mockSpawn).toHaveBeenCalledWith(
       'wt.exe',
-      expect.any(Array),
-      expect.objectContaining({ cwd: '/custom/cwd' }),
+      expect.arrayContaining(['-d', '/custom/cwd']),
+      expect.objectContaining({ detached: true }),
     );
   });
 

@@ -9,6 +9,7 @@ const WorkflowConditionsSchema = z.object({
 export const WorkflowConfigSchema = z.object({
   name: z.string(),
   conditions: WorkflowConditionsSchema,
+  disallowedWords: z.array(z.string()).optional(),
   command: z.string(),
   workingDirectory: z.string().optional(),
   preambleExtra: z.string().optional(),
@@ -21,7 +22,7 @@ export type LoadedWorkflowConfig = WorkflowConfig & { sourceFile: string };
 export interface LogEntry {
   time: string;
   message: string;
-  kind: 'info' | 'refresh' | 'error' | 'found' | 'workflow';
+  kind: 'info' | 'refresh' | 'error' | 'found' | 'workflow' | 'keywords' | 'skipped' | 'global-skip';
 }
 
 export interface RefreshResult {
