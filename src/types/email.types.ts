@@ -34,7 +34,7 @@ export interface SearchFilters {
   from?: string;
   to?: string;
   subject?: string;
-  keyword?: string;
+  keywords?: string[];
   dateFrom?: string;
   dateTo?: string;
   hasAttachments?: boolean;

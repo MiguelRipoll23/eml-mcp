@@ -32,20 +32,20 @@ describe('IndexService', () => {
   describe('upsert and search by keyword', () => {
     it('finds an email by keyword in subject', () => {
       service.upsert(makeEntry({ subject: 'Quarterly Report' }));
-      const results = service.search({ keyword: 'Quarterly' }, 10);
+      const results = service.search({ keywords: ['Quarterly'] }, 10);
       expect(results).toHaveLength(1);
       expect(results[0].subject).toBe('Quarterly Report');
     });
 
     it('finds an email by keyword in body', () => {
       service.upsert(makeEntry({ textBody: 'The budget is approved for next quarter' }));
-      const results = service.search({ keyword: 'budget' }, 10);
+      const results = service.search({ keywords: ['budget'] }, 10);
       expect(results).toHaveLength(1);
     });
 
     it('finds an email by keyword in attachment names', () => {
       service.upsert(makeEntry({ attachmentNames: 'invoice.pdf contract.docx' }));
-      const results = service.search({ keyword: 'invoice' }, 10);
+      const results = service.search({ keywords: ['invoice'] }, 10);
       expect(results).toHaveLength(1);
     });
   });
@@ -98,10 +98,10 @@ describe('IndexService', () => {
       service.upsert(makeEntry({ subject: 'Original' }));
       service.upsert(makeEntry({ subject: 'Updated' }));
 
-      const results = service.search({ keyword: 'Updated' }, 10);
+      const results = service.search({ keywords: ['Updated'] }, 10);
       expect(results).toHaveLength(1);
 
-      const origResults = service.search({ keyword: 'Original' }, 10);
+      const origResults = service.search({ keywords: ['Original'] }, 10);
       expect(origResults).toHaveLength(0);
     });
   });
@@ -111,7 +111,7 @@ describe('IndexService', () => {
       service.upsert(makeEntry());
       service.remove('<test@example.com>');
 
-      const results = service.search({ keyword: 'Test Subject' }, 10);
+      const results = service.search({ keywords: ['Test Subject'] }, 10);
       expect(results).toHaveLength(0);
     });
   });
@@ -172,7 +172,7 @@ describe('search result shape', () => {
 
   it('keyword search also returns fromAddress and hasAttachments', () => {
     service.upsert(makeEntry({ fromAddress: 'alice@example.com', hasAttachments: 0, fileSize: 2048, subject: 'Budget Report' }));
-    const results = service.search({ keyword: 'Budget' }, 10);
+    const results = service.search({ keywords: ['Budget'] }, 10);
     expect(results[0].fromAddress).toBe('alice@example.com');
     expect(results[0].hasAttachments).toBe(0);
     expect(results[0].fileSize).toBe(2048);
@@ -211,7 +211,7 @@ describe('search sortOrder', () => {
   it('applies sortOrder together with keyword search', () => {
     service.upsert(makeEntry({ messageId: '<kw-old@x.com>', date: '2023-01-01T00:00:00.000Z', subject: 'sorttest' }));
     service.upsert(makeEntry({ messageId: '<kw-new@x.com>', date: '2027-01-01T00:00:00.000Z', subject: 'sorttest' }));
-    const asc = service.search({ keyword: 'sorttest' }, 10, 'asc');
+    const asc = service.search({ keywords: ['sorttest'] }, 10, 'asc');
     expect(asc[0].messageId).toBe('<kw-old@x.com>');
     expect(asc[1].messageId).toBe('<kw-new@x.com>');
   });
@@ -233,7 +233,7 @@ describe('IndexService.count', () => {
   });
 
   it('returns count matching a keyword', () => {
-    expect(service.count({ keyword: 'Invoice' })).toBe(2);
+    expect(service.count({ keywords: ['Invoice'] })).toBe(2);
   });
 
   it('returns count matching a from filter', () => {

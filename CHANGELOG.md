@@ -1,14 +1,28 @@
 # Changelog
 
-## v2.2.0 - 2026-06-19
+## [Unreleased]
 
-## What's Changed
-* feat: global and per-workflow disallowed words, word-boundary matching, activity log improvements by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/21
-* Bump version to v2.2.0 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/22
+### Added
+- **`eml-cli email` subcommands**: `search`, `get`, `open`, `compose`, `update`, `delete` — full email operations from the CLI, mirroring the MCP server tools. `search` supports all filters (keyword, from, to, subject, date-from, date-to, has-attachments, folder, file-path, limit, sort). `compose` and `update` accept comma-separated `--to`, `--cc`, `--bcc`, `--attach`, and `--references` values.
+- **`eml-cli attachment` subcommands**: `search`, `extract`, `open` — find emails with attachments, extract one or all attachments to a directory, and open an attachment with the default application.
+- **CLI utility** (`eml-cli`): `refresh_index` and `stats` commands for headless operations — refreshing the email index and comparing on-disk vs indexed counts per folder.
+- **Terminal UI** (`eml` / `eml-tui`): Ink-based interactive dashboard for watching email directories, running workflows, and managing `.eml` files directly from the terminal.
+- **`search_emails`: `sortOrder` parameter**: accepts `"asc"` or `"desc"` (default `"desc"`), controlling whether results are returned newest-first or oldest-first. Applied to both plain and full-text keyword searches.
+- **`search_emails`: `indexLastRefreshedAt` field**: the response now includes the ISO timestamp of the last time any email was indexed, so the caller can tell whether the index may be stale before relying on the results.
 
+### Changed
+- **`eml-cli disallowed-words` renamed to `eml filter`**: shorter, singular, consistent with `email` and `attachment` commands. Subcommands unchanged: `list`, `add`, `remove`, `clear`. Internal store and data file path unchanged.
+- **Multi-keyword search**: `SearchFilters.keyword` renamed to `keywords: string[]` across MCP tools, CLI, and internal services. All terms are joined with a space and matched via SQLite FTS4 implicit AND. MCP: `keywords: ["invoice", "report"]`. CLI: `--keywords "invoice,report"` (comma-separated). Affects `search_emails`, `search_attachments` MCP tools and `eml-cli email search`, `eml-cli attachment search` commands.
+- **Workflow preamble uses CLI instead of MCP tools**: `buildPreamble` now instructs Claude to run `eml-cli email get "<filePath>"` for the email content and `eml-cli email search --keyword "..."` for related-email lookups. Full file path passed instead of basename.
+- **CLI internal refactor**: shared helpers (`DATA_PATH_ARG`, `resolveEmailDirectory`, `writePromptFile`, `buildServices`) extracted to `src/cli/shared.ts`; email and attachment commands extracted to `src/cli/email-commands.ts`. `indexRefreshCommand` simplified via `buildServices`.
+- `formatDateLocal` now uses the server's runtime locale and timezone (`Intl.DateTimeFormat().resolvedOptions()`) instead of hardcoded `es-ES` / `Europe/Madrid`.
+- `search_emails` results now include a `dateLocal` field formatted in the server's local locale and timezone.
 
-**Full Changelog**: https://github.com/MiguelRipoll23/eml-mcp/compare/v2.1.0...v2.2.0
-
+### Fixed
+- **HTML-only `.eml` files not parsed (Outlook-exported emails)**: Outlook sometimes saves sent emails as raw HTML files with a `.eml` extension instead of proper MIME format. The parser now detects this case (file content starts with `<` and has no RFC 2822 headers) and wraps the content in a minimal MIME envelope so the HTML body is correctly extracted. Subject and date are recovered from the filename timestamp pattern `YYYY-MM-DD_HH-MM-SS__Subject.eml` when MIME headers are absent. This fixes both `get_email` (returned empty headers and no body) and `refresh_index` (indexed these files with epoch date `1970-01-01`, making them invisible to date-filtered searches).
+- **Full name truncated when replying to Exchange emails**: display names in `APELLIDO, NOMBRE` format (e.g. `DOE SMITH, JANE ALICE`) were returned unquoted by `formatAddressText`, causing nodemailer's address parser to split on the comma and discard the surname tokens. `formatAddressText` now wraps names containing RFC 2822 special characters (`,`, `;`, `(`, `)`, `<`, `>`, etc.) in double quotes, preserving the full name through the compose pipeline.
+- **Synthetic display name used instead of bare address**: some clients/servers populate the display name with the local-part of the address (e.g. `john.doe` for `john.doe@company.com`) or repeat the full address as the display name. `formatAddressText` now discards a display name that is identical to the local-part or the full address, returning just the bare address instead.
+- **Outlook adds the user as a recipient when doing Reply All on a draft**: composed `.eml` drafts did not carry `X-Unsent: 1`, so Outlook opened them as received messages. When the user clicked Reply All, Outlook included the `From` address (the user's own address) as a new recipient. All drafts now include `X-Unsent: 1`, instructing Outlook to open the file directly in compose mode.
 
 ## v2.4.1 - 2026-06-17
 
@@ -144,12 +158,6 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
-
-### Added
-
-- **TUI keyboard hints**: the tab bar now shows `[enter] run  [p] prompt` when on the workflows view, indicating the available actions for workflow items.
 
 ---
 

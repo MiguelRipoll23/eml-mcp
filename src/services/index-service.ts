@@ -152,15 +152,16 @@ export class IndexService {
   count(filters: SearchFilters): number {
     this.assertInitialized();
     let activeFilters = { ...filters };
-    if (activeFilters.keyword !== undefined && activeFilters.keyword.trim() === '') {
-      activeFilters = { ...activeFilters, keyword: undefined };
+    if (activeFilters.keywords !== undefined && activeFilters.keywords.filter(k => k.trim()).length === 0) {
+      activeFilters = { ...activeFilters, keywords: undefined };
     }
     const { conditions, params } = this.buildConditions(activeFilters);
+    const ftsQuery = activeFilters.keywords?.filter(k => k.trim()).join(' ');
 
     let sql: string;
     let allParams: SqlValue[];
 
-    if (activeFilters.keyword) {
+    if (ftsQuery) {
       sql = `
         SELECT COUNT(*) as total
         FROM emails_fts f
@@ -168,7 +169,7 @@ export class IndexService {
         WHERE emails_fts MATCH ?
           ${conditions.length ? 'AND ' + conditions.join(' AND ') : ''}
       `;
-      allParams = [activeFilters.keyword, ...params];
+      allParams = [ftsQuery, ...params];
     } else {
       sql = `
         SELECT COUNT(*) as total
@@ -186,18 +187,19 @@ export class IndexService {
     this.assertInitialized();
     let activeFilters = { ...filters };
 
-    // Guard against empty keyword — FTS MATCH '' throws
-    if (activeFilters.keyword !== undefined && activeFilters.keyword.trim() === '') {
-      activeFilters = { ...activeFilters, keyword: undefined };
+    // Guard against empty keywords array — FTS MATCH '' throws
+    if (activeFilters.keywords !== undefined && activeFilters.keywords.filter(k => k.trim()).length === 0) {
+      activeFilters = { ...activeFilters, keywords: undefined };
     }
 
     const { conditions, params } = this.buildConditions(activeFilters);
     const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
+    const ftsQuery = activeFilters.keywords?.filter(k => k.trim()).join(' ');
 
     let sql: string;
     let allParams: SqlValue[];
 
-    if (activeFilters.keyword) {
+    if (ftsQuery) {
       sql = `
         SELECT m.messageId, m.filePath, m.fromAddress, m.toAddresses, m.ccAddresses,
                m.subject, m.date, m.hasAttachments, m.fileSize, m.indexedAt, m.folder
@@ -208,7 +210,7 @@ export class IndexService {
         ORDER BY m.date ${order}
         LIMIT ?
       `;
-      allParams = [activeFilters.keyword, ...params, limit];
+      allParams = [ftsQuery, ...params, limit];
     } else {
       sql = `
         SELECT messageId, filePath, fromAddress, toAddresses, ccAddresses,

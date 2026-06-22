@@ -53,14 +53,13 @@ function mimeTypeToExtension(mimeType: string): string {
 }
 
 export async function handleSearchAttachments(
-  args: { filename?: string; contentType?: string; keyword?: string },
+  args: { filename?: string; contentType?: string; keywords?: string[] },
   services: Services,
 ) {
   const contentTypeKeyword = args.contentType ? mimeTypeToExtension(args.contentType) : undefined;
-  const terms = [args.filename, contentTypeKeyword, args.keyword].filter(Boolean);
-  const keyword = terms.length > 0 ? terms.join(' ') : undefined;
+  const terms = [args.filename, contentTypeKeyword, ...(args.keywords ?? [])].filter(Boolean) as string[];
   try {
-    const searchFilters: SearchFilters = { keyword, hasAttachments: true };
+    const searchFilters: SearchFilters = { keywords: terms.length > 0 ? terms : undefined, hasAttachments: true };
     const results = services.index.search(searchFilters, 50);
     const count = services.index.count(searchFilters);
     return toMcpSuccess({ results, count });
@@ -127,7 +126,7 @@ export function registerAttachmentTools(server: McpServer, services: Services): 
           .string()
           .optional()
           .describe('MIME type (e.g. application/pdf) — searches by file extension derived from the subtype'),
-        keyword: z.string().optional().describe('Content or name keyword'),
+        keywords: z.array(z.string()).optional().describe('Content or name keywords — all terms joined with AND'),
       },
       outputSchema: {
         results: z.array(z.object(indexEntryOutputSchema)),

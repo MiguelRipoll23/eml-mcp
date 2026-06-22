@@ -8,7 +8,7 @@ import type { ComposeOptions } from '../services/email-composer.js';
 import { toMcpSuccess, toMcpError } from '../types/error.types.js';
 
 const searchSchema = {
-  keyword: z.string().optional().describe('Full-text search across body, subject, attachments'),
+  keywords: z.array(z.string()).optional().describe('Full-text search across body, subject, attachments — all terms joined with AND'),
   from: z.string().optional().describe('Filter by sender (partial match)'),
   to: z.string().optional().describe('Filter by recipient (partial match)'),
   subject: z.string().optional().describe('Filter by subject (partial match)'),
@@ -60,7 +60,7 @@ function inferFolder(filePath: string, config: ServerConfig): EmailFolder {
 
 export async function handleSearchEmails(
   args: {
-    keyword?: string;
+    keywords?: string[];
     from?: string;
     to?: string;
     subject?: string;
@@ -76,7 +76,7 @@ export async function handleSearchEmails(
 ) {
   try {
     const filters: SearchFilters = {
-      keyword: args.keyword,
+      keywords: args.keywords,
       from: args.from,
       to: args.to,
       subject: args.subject,

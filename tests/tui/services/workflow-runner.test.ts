@@ -16,24 +16,24 @@ vi.mock('child_process', () => ({
 }));
 
 describe('buildPreamble', () => {
-  it('includes filename in header and search call', () => {
-    const result = buildPreamble('alert-2026.eml', ['grr', 'gis']);
-    expect(result).toContain('**File:** `alert-2026.eml`');
-    expect(result).toContain('filePath: "alert-2026.eml"');
+  it('includes file path in header and get command', () => {
+    const result = buildPreamble('/inbox/alert-2026.eml', ['grr', 'gis']);
+    expect(result).toContain('**File:** `/inbox/alert-2026.eml`');
+    expect(result).toContain('eml-cli email get "/inbox/alert-2026.eml"');
   });
 
-  it('includes folder inbox in search call', () => {
-    const result = buildPreamble('alert-2026.eml', ['grr', 'gis']);
-    expect(result).toContain('folder: "inbox"');
+  it('includes cli search command', () => {
+    const result = buildPreamble('/inbox/alert-2026.eml', ['grr', 'gis']);
+    expect(result).toContain('eml-cli email search');
   });
 
   it('lists workflow keywords', () => {
-    const result = buildPreamble('alert-2026.eml', ['grr', 'gis', 'adms']);
+    const result = buildPreamble('/inbox/alert-2026.eml', ['grr', 'gis', 'adms']);
     expect(result).toContain('**Keywords:** grr, gis, adms');
   });
 
   it('does not append extra content when preambleExtra is absent', () => {
-    const result = buildPreamble('alert-2026.eml', ['grr']);
+    const result = buildPreamble('/inbox/alert-2026.eml', ['grr']);
     const lines = result.trimEnd().split('\n');
     expect(lines[lines.length - 1].trim()).not.toBe('');
     expect(result).not.toContain('undefined');
@@ -42,7 +42,7 @@ describe('buildPreamble', () => {
 
   it('appends preambleExtra when provided', () => {
     const extra = 'Only process if addressed to me, Miguel.';
-    const result = buildPreamble('alert-2026.eml', ['spot'], extra);
+    const result = buildPreamble('/inbox/alert-2026.eml', ['spot'], extra);
     expect(result).toContain(extra);
     const baseEnd = result.indexOf(extra);
     expect(result.substring(0, baseEnd).trimEnd().length).toBeGreaterThan(0);
