@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.3.0-beta.1 - 2026-06-22
+
+## What's Changed
+* feat: CLI email/attachment subcommands, filter rename, multi-keyword search, preamble via CLI by @MiguelRipoll23 in https://github.com/MiguelRipoll23/eml-mcp/pull/23
+* Bump version to v2.3.0-beta.1 by @github-actions[bot] in https://github.com/MiguelRipoll23/eml-mcp/pull/24
+
+
+**Full Changelog**: https://github.com/MiguelRipoll23/eml-mcp/compare/v2.2.0...v2.3.0-beta.1
+
+
 ## [Unreleased]
 
 ### Added
