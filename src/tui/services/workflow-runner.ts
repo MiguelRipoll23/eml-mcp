@@ -30,9 +30,9 @@ export interface EmailProcessResult {
   skips: WorkflowSkip[];
 }
 
-export function buildPreamble(filename: string, keywords: string[], preambleExtra?: string): string {
+export function buildPreamble(filePath: string, keywords: string[], preambleExtra?: string): string {
   const kw = keywords.join(', ');
-  const base = `## Email to process\n\n**File:** \`${filename}\`\n**Keywords:** ${kw}\n\nFetch this email: call \`search_emails\` with \`folder: "inbox"\` and \`filePath: "${filename}"\` to locate the record, then \`get_email\` with the returned path for the full content. To find related emails for context, use \`search_emails\` with the keywords above.`;
+  const base = `## Email to process\n\n**File:** \`${filePath}\`\n**Keywords:** ${kw}\n\nRead this email: run \`eml-cli email get "${filePath}"\` for the full content. To find related emails for context, run \`eml-cli email search --keyword "keyword"\` (replace \`keyword\` with relevant terms from the list above).`;
   return preambleExtra ? `${base}\n\n${preambleExtra}\n\n` : `${base}\n\n`;
 }
 
@@ -143,8 +143,7 @@ export async function processEmail(
     const vars = { subject, from, body, date, file: filePath };
     const renderedPrompt = renderTemplate(promptTemplate, vars);
 
-    const filename = path.basename(filePath);
-    const preamble = buildPreamble(filename, workflow.conditions.keywords, workflow.preambleExtra);
+    const preamble = buildPreamble(filePath, workflow.conditions.keywords, workflow.preambleExtra);
     const fullPrompt = preamble + renderedPrompt;
 
     const promptFile = path.join(os.tmpdir(), `eml-mcp-${messageId.replace(/[^a-zA-Z0-9]/g, '_')}.md`);

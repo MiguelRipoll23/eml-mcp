@@ -4,40 +4,12 @@ import * as fs from 'fs';
 import { defineCommand, runMain } from 'citty';
 import { IndexService } from './services/index-service.js';
 import { FilesystemService } from './services/filesystem-service.js';
-import { EmailParser } from './services/email-parser.js';
-import { AttachmentService } from './services/attachment-service.js';
-import { EmailComposer } from './services/email-composer.js';
 import { getEmlPaths } from './constants/paths.js';
-import { loadConfig } from './tui/services/config-store.js';
 import { loadDisallowedWords, saveDisallowedWords } from './tui/services/disallowed-words-store.js';
 import { handleRefreshIndex } from './tools/index-tools.js';
 import { WorkflowConfigSchema } from './tui/types/workflow.types.js';
-import type { Services } from './types/service.types.js';
-
-const DATA_PATH_ARG = {
-  'data-path': {
-    type: 'string' as const,
-    description: 'Data directory (default: ~/.eml)',
-  },
-};
-
-function resolveEmailDirectory(directory: string | undefined, dataPath: string | undefined): string {
-  if (directory) return path.resolve(directory);
-  const emlPaths = getEmlPaths(dataPath);
-  const config = loadConfig(emlPaths.configPath);
-  if (config) return config.emailDirectory;
-  throw new Error(
-    'No email directory specified and no saved config found.\n' +
-    'Run the MCP server first (eml-mcp <email-directory>) or pass the directory explicitly.',
-  );
-}
-
-function writePromptFile(promptsDir: string, slug: string, content: string): void {
-  fs.mkdirSync(promptsDir, { recursive: true });
-  const promptPath = path.join(promptsDir, `${slug}.md`);
-  fs.writeFileSync(promptPath, content, 'utf-8');
-  process.stdout.write(`Prompt:  ${promptPath}\n`);
-}
+import { DATA_PATH_ARG, resolveEmailDirectory, writePromptFile, buildServices } from './cli/shared.js';
+import { emailCommand, attachmentCommand } from './cli/email-commands.js';
 
 const indexRefreshCommand = defineCommand({
   meta: { name: 'index refresh', description: 'Refresh the email index' },
@@ -47,33 +19,9 @@ const indexRefreshCommand = defineCommand({
   },
   async run({ args }) {
     const dataPath = args['data-path'];
-    const emlPaths = getEmlPaths(dataPath);
     const emailDirectory = resolveEmailDirectory(args.directory, dataPath);
-
-    const inboxDirectory = path.join(emailDirectory, 'inbox');
-    const outboxDirectory = path.join(emailDirectory, 'outbox');
-    const draftsDirectory = path.join(emailDirectory, 'drafts');
-
-    for (const dir of [inboxDirectory, outboxDirectory, draftsDirectory]) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    const filesystem = new FilesystemService();
-    const parser = new EmailParser(filesystem);
-    const index = new IndexService(emlPaths.indexDbPath);
-    const attachment = new AttachmentService(parser, filesystem);
-    const composer = new EmailComposer(filesystem, draftsDirectory, 'draft@eml-mcp');
-
-    const services: Services = {
-      config: { inboxDirectory, outboxDirectory, draftsDirectory },
-      filesystem,
-      parser,
-      index,
-      attachment,
-      composer,
-    };
-
-    await index.initialize();
+    const { services } = buildServices(emailDirectory, dataPath);
+    await services.index.initialize();
     const result = await handleRefreshIndex(services);
     const { added, removed, updated } = result.structuredContent as { added: number; removed: number; updated: number };
     process.stdout.write(`Refresh complete: ${added} added, ${updated} updated, ${removed} removed\n`);
@@ -135,8 +83,8 @@ const indexCommand = defineCommand({
   },
 });
 
-const disallowedWordsListCommand = defineCommand({
-  meta: { name: 'disallowed-words list', description: 'List global disallowed words' },
+const filterListCommand = defineCommand({
+  meta: { name: 'filter list', description: 'List filtered words' },
   args: { ...DATA_PATH_ARG },
   run({ args }) {
     const emlPaths = getEmlPaths(args['data-path']);
@@ -151,8 +99,8 @@ const disallowedWordsListCommand = defineCommand({
   },
 });
 
-const disallowedWordsAddCommand = defineCommand({
-  meta: { name: 'disallowed-words add', description: 'Add a global disallowed word' },
+const filterAddCommand = defineCommand({
+  meta: { name: 'filter add', description: 'Add a word to the filter' },
   args: {
     word: { type: 'positional', description: 'Word to add', required: true },
     ...DATA_PATH_ARG,
@@ -169,8 +117,8 @@ const disallowedWordsAddCommand = defineCommand({
   },
 });
 
-const disallowedWordsRemoveCommand = defineCommand({
-  meta: { name: 'disallowed-words remove', description: 'Remove a global disallowed word' },
+const filterRemoveCommand = defineCommand({
+  meta: { name: 'filter remove', description: 'Remove a word from the filter' },
   args: {
     word: { type: 'positional', description: 'Word to remove', required: true },
     ...DATA_PATH_ARG,
@@ -188,8 +136,8 @@ const disallowedWordsRemoveCommand = defineCommand({
   },
 });
 
-const disallowedWordsClearCommand = defineCommand({
-  meta: { name: 'disallowed-words clear', description: 'Remove all global disallowed words' },
+const filterClearCommand = defineCommand({
+  meta: { name: 'filter clear', description: 'Clear all filtered words' },
   args: { ...DATA_PATH_ARG },
   run({ args }) {
     const emlPaths = getEmlPaths(args['data-path']);
@@ -198,13 +146,13 @@ const disallowedWordsClearCommand = defineCommand({
   },
 });
 
-const disallowedWordsCommand = defineCommand({
-  meta: { name: 'disallowed-words', description: 'Manage global disallowed words' },
+const filterCommand = defineCommand({
+  meta: { name: 'filter', description: 'Manage global word filter' },
   subCommands: {
-    list: disallowedWordsListCommand,
-    add: disallowedWordsAddCommand,
-    remove: disallowedWordsRemoveCommand,
-    clear: disallowedWordsClearCommand,
+    list: filterListCommand,
+    add: filterAddCommand,
+    remove: filterRemoveCommand,
+    clear: filterClearCommand,
   },
 });
 
@@ -387,7 +335,9 @@ const main = defineCommand({
   subCommands: {
     index: indexCommand,
     workflow: workflowCommand,
-    'disallowed-words': disallowedWordsCommand,
+    filter: filterCommand,
+    email: emailCommand,
+    attachment: attachmentCommand,
   },
 });
 

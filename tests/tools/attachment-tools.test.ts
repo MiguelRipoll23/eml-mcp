@@ -170,7 +170,7 @@ describe('handleSearchAttachments — error handling', () => {
         getAll: vi.fn().mockReturnValue([]),
       } as never,
     });
-    const result = await handleSearchAttachments({ keyword: 'bad(query' }, services);
+    const result = await handleSearchAttachments({ keywords: ['bad(query'] }, services);
     expect(result.isError).toBe(true);
     const data = JSON.parse(result.content[0].text);
     expect(data.error).toBe('SEARCH_ERROR');
@@ -193,28 +193,28 @@ describe('handleSearchAttachments — contentType to extension', () => {
     const services = makeAttSearchServices();
     await handleSearchAttachments({ contentType: 'application/pdf' }, services);
     const call = (services.index.search as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.keyword).toContain('pdf');
+    expect(call.keywords).toContain('pdf');
   });
 
   it('does not include the MIME type prefix in keyword', async () => {
     const services = makeAttSearchServices();
     await handleSearchAttachments({ contentType: 'application/pdf' }, services);
     const call = (services.index.search as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.keyword).not.toContain('application');
+    expect(call.keywords).not.toContain('application');
   });
 
   it('handles image MIME types', async () => {
     const services = makeAttSearchServices();
     await handleSearchAttachments({ contentType: 'image/jpeg' }, services);
     const call = (services.index.search as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.keyword).toContain('jpeg');
+    expect(call.keywords).toContain('jpeg');
   });
 
   it('combines contentType extension with filename keyword', async () => {
     const services = makeAttSearchServices();
     await handleSearchAttachments({ contentType: 'application/pdf', filename: 'invoice' }, services);
     const call = (services.index.search as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.keyword).toContain('pdf');
-    expect(call.keyword).toContain('invoice');
+    expect(call.keywords).toContain('pdf');
+    expect(call.keywords).toContain('invoice');
   });
 });

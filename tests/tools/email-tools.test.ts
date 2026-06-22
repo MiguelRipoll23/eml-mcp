@@ -80,7 +80,7 @@ function makeServices(overrides: Partial<Services> = {}): Services {
 describe('handleSearchEmails', () => {
   it('delegates to IndexService.search and returns results', async () => {
     const services = makeServices();
-    const result = await handleSearchEmails({ keyword: 'test', limit: 10 }, services);
+    const result = await handleSearchEmails({ keywords: ['test'], limit: 10 }, services);
     const data = JSON.parse(result.content[0].text);
     expect(data.results).toHaveLength(1);
     expect(data.results[0].subject).toBe('Test');
@@ -88,7 +88,7 @@ describe('handleSearchEmails', () => {
 
   it('returns fromAddress matching the outputSchema (not the EmailHeader from field)', async () => {
     const services = makeServices();
-    const result = await handleSearchEmails({ keyword: 'test', limit: 10 }, services);
+    const result = await handleSearchEmails({ keywords: ['test'], limit: 10 }, services);
     const data = JSON.parse(result.content[0].text);
     expect(data.results[0].fromAddress).toBe('alice@example.com');
     expect(data.results[0].from).toBeUndefined();
@@ -96,7 +96,7 @@ describe('handleSearchEmails', () => {
 
   it('returns hasAttachments, fileSize, and indexedAt in search results', async () => {
     const services = makeServices();
-    const result = await handleSearchEmails({ keyword: 'test', limit: 10 }, services);
+    const result = await handleSearchEmails({ keywords: ['test'], limit: 10 }, services);
     const data = JSON.parse(result.content[0].text);
     expect(data.results[0].hasAttachments).toBe(0);
     expect(data.results[0].fileSize).toBe(1024);
@@ -105,7 +105,7 @@ describe('handleSearchEmails', () => {
 
   it('includes dateLocal in search results', async () => {
     const services = makeServices();
-    const result = await handleSearchEmails({ keyword: 'test', limit: 10 }, services);
+    const result = await handleSearchEmails({ keywords: ['test'], limit: 10 }, services);
     const data = JSON.parse(result.content[0].text);
     expect(data.results[0].dateLocal).toBeDefined();
     expect(typeof data.results[0].dateLocal).toBe('string');
@@ -150,7 +150,7 @@ describe('handleSearchEmails — error handling', () => {
         upsert: vi.fn(),
       } as never,
     });
-    const result = await handleSearchEmails({ keyword: 'bad(query' }, services);
+    const result = await handleSearchEmails({ keywords: ['bad(query'] }, services);
     expect(result.isError).toBe(true);
     const data = JSON.parse(result.content[0].text);
     expect(data.error).toBe('SEARCH_ERROR');
